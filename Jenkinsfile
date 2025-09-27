@@ -163,7 +163,7 @@ pipeline {
                                     -e PRODUCT_SERVICE_URL=http://product-service-test:8000 ^
                                     -e ORDER_SERVICE_URL=http://order-service-test:8000 ^
                                     product-service ^
-                                    python -m pytest tests/integration/test_product_integration.py -v --junitxml=/app/test-reports/integration-test-results-product.xml
+                                    python -m pytest tests/integration/test_simple_integration.py -v --junitxml=/app/test-reports/integration-test-results-product.xml
                             '''
                             
                             // Run integration tests for Order Service
@@ -173,7 +173,7 @@ pipeline {
                                     -e PRODUCT_SERVICE_URL=http://product-service-test:8000 ^
                                     -e ORDER_SERVICE_URL=http://order-service-test:8000 ^
                                     order-service ^
-                                    python -m pytest tests/integration/test_order_integration.py -v --junitxml=/app/test-reports/integration-test-results-order.xml
+                                    python -m pytest tests/integration/test_simple_integration.py -v --junitxml=/app/test-reports/integration-test-results-order.xml
                             '''
                         }
                     }

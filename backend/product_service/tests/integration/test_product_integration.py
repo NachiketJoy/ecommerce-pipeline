@@ -7,9 +7,6 @@ from unittest.mock import patch
 
 import pytest
 import requests
-from fastapi.testclient import TestClient
-
-from app.main import app
 
 # Suppress noisy logs during integration tests
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
@@ -17,12 +14,8 @@ logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
 logging.getLogger("fastapi").setLevel(logging.WARNING)
 logging.getLogger("app.main").setLevel(logging.WARNING)
 
-
-@pytest.fixture(scope="module")
-def client():
-    """Create a test client for integration tests."""
-    with TestClient(app) as test_client:
-        yield test_client
+# Integration test configuration
+PRODUCT_SERVICE_URL = os.getenv("PRODUCT_SERVICE_URL", "http://localhost:8000")
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -43,7 +36,7 @@ def setup_integration_environment():
 class TestProductServiceIntegration:
     """Integration tests for Product Service."""
 
-    def test_create_and_retrieve_product_flow(self, client):
+    def test_create_and_retrieve_product_flow(self):
         """Test the complete flow of creating and retrieving a product."""
         # Create a product
         product_data = {
@@ -54,14 +47,14 @@ class TestProductServiceIntegration:
             "image_url": "http://example.com/test.jpg"
         }
         
-        create_response = client.post("/products/", json=product_data)
+        create_response = requests.post(f"{PRODUCT_SERVICE_URL}/products/", json=product_data)
         assert create_response.status_code == 201
         
         created_product = create_response.json()
         product_id = created_product["product_id"]
         
         # Retrieve the product
-        get_response = client.get(f"/products/{product_id}")
+        get_response = requests.get(f"{PRODUCT_SERVICE_URL}/products/{product_id}")
         assert get_response.status_code == 200
         
         retrieved_product = get_response.json()
