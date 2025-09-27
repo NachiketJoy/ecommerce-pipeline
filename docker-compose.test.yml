@@ -1,4 +1,4 @@
-version: "3.8"
+
 
 services:
   # Test Database for Product Service
@@ -43,7 +43,7 @@ services:
 
   # Product Service for Testing
   product-service-test:
-    image: product-service
+    image: njoy10/product-service:test
     container_name: product_service_test_container
     ports:
       - "8000:8000"
@@ -71,7 +71,7 @@ services:
 
   # Order Service for Testing
   order-service-test:
-    image: order-service
+    image: njoy10/order-service:test
     container_name: order_service_test_container
     ports:
       - "8001:8000"
@@ -98,7 +98,7 @@ services:
 
   # Frontend for Testing
   frontend-test:
-    image: frontend
+    image: njoy10/frontend:test
     container_name: frontend_test_container
     ports:
       - "3000:80"
