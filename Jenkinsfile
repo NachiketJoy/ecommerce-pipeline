@@ -44,7 +44,7 @@ pipeline {
                 echo 'Checking out source code...'
                 checkout scm
                 script {
-                    env.GIT_COMMIT_SHORT = sh(
+                    env.GIT_COMMIT_SHORT = bat(
                         script: 'git rev-parse --short HEAD',
                         returnStdout: true
                     ).trim()
@@ -112,7 +112,7 @@ pipeline {
                         echo 'Running Product Service unit tests...'
                         script {
                             docker.image("${PRODUCT_SERVICE_IMAGE}:${BUILD_TAG}").inside('-v /var/run/docker.sock:/var/run/docker.sock') {
-                                sh '''
+                                bat '''
                                     cd /app
                                     python -m pytest tests/ -v --tb=short --junitxml=test-results-product.xml --cov=app --cov-report=xml --cov-report=html
                                 '''
@@ -134,7 +134,7 @@ pipeline {
                         echo 'Running Order Service unit tests...'
                         script {
                             docker.image("${ORDER_SERVICE_IMAGE}:${BUILD_TAG}").inside('-v /var/run/docker.sock:/var/run/docker.sock') {
-                                sh '''
+                                bat '''
                                     cd /app
                                     python -m pytest tests/ -v --tb=short --junitxml=test-results-order.xml --cov=app --cov-report=xml --cov-report=html
                                 '''
@@ -156,17 +156,17 @@ pipeline {
                         echo 'Running integration tests...'
                         script {
                             // Start test environment
-                            sh '''
+                            bat '''
                                 docker-compose -f docker-compose.test.yml up -d
-                                sleep 30  # Wait for services to be ready
+                                timeout /t 30 /nobreak >nul 2>&1
                             '''
                             
                             // Run integration tests
-                            sh '''
-                                docker run --rm --network ecommerce_test_network \\
-                                    -e PRODUCT_SERVICE_URL=http://product-service-test:8000 \\
-                                    -e ORDER_SERVICE_URL=http://order-service-test:8000 \\
-                                    ${PRODUCT_SERVICE_IMAGE}:${BUILD_TAG} \\
+                            bat '''
+                                docker run --rm --network ecommerce_test_network ^
+                                    -e PRODUCT_SERVICE_URL=http://product-service-test:8000 ^
+                                    -e ORDER_SERVICE_URL=http://order-service-test:8000 ^
+                                    %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG% ^
                                     python -m pytest tests/integration/ -v --junitxml=integration-test-results.xml
                             '''
                         }
@@ -174,7 +174,7 @@ pipeline {
                     post {
                         always {
                             publishTestResults testResultsPattern: '**/integration-test-results.xml'
-                            sh 'docker-compose -f docker-compose.test.yml down -v'
+                            bat 'docker-compose -f docker-compose.test.yml down -v'
                         }
                     }
                 }
@@ -188,14 +188,14 @@ pipeline {
                         echo 'Running SonarQube analysis for Product Service...'
                         script {
                             docker.image("${PRODUCT_SERVICE_IMAGE}:${BUILD_TAG}").inside() {
-                                sh '''
+                                bat '''
                                     cd /app
-                                    sonar-scanner \\
-                                        -Dsonar.projectKey=ecommerce-product-service \\
-                                        -Dsonar.sources=. \\
-                                        -Dsonar.host.url=${SONAR_HOST_URL} \\
-                                        -Dsonar.login=${SONAR_TOKEN} \\
-                                        -Dsonar.python.coverage.reportPaths=coverage.xml \\
+                                    sonar-scanner ^
+                                        -Dsonar.projectKey=ecommerce-product-service ^
+                                        -Dsonar.sources=. ^
+                                        -Dsonar.host.url=%SONAR_HOST_URL% ^
+                                        -Dsonar.login=%SONAR_TOKEN% ^
+                                        -Dsonar.python.coverage.reportPaths=coverage.xml ^
                                         -Dsonar.python.xunit.reportPath=test-results-product.xml
                                 '''
                             }
@@ -208,14 +208,14 @@ pipeline {
                         echo 'Running SonarQube analysis for Order Service...'
                         script {
                             docker.image("${ORDER_SERVICE_IMAGE}:${BUILD_TAG}").inside() {
-                                sh '''
+                                bat '''
                                     cd /app
-                                    sonar-scanner \\
-                                        -Dsonar.projectKey=ecommerce-order-service \\
-                                        -Dsonar.sources=. \\
-                                        -Dsonar.host.url=${SONAR_HOST_URL} \\
-                                        -Dsonar.login=${SONAR_TOKEN} \\
-                                        -Dsonar.python.coverage.reportPaths=coverage.xml \\
+                                    sonar-scanner ^
+                                        -Dsonar.projectKey=ecommerce-order-service ^
+                                        -Dsonar.sources=. ^
+                                        -Dsonar.host.url=%SONAR_HOST_URL% ^
+                                        -Dsonar.login=%SONAR_TOKEN% ^
+                                        -Dsonar.python.coverage.reportPaths=coverage.xml ^
                                         -Dsonar.python.xunit.reportPath=test-results-order.xml
                                 '''
                             }
@@ -239,19 +239,25 @@ pipeline {
                     steps {
                         echo 'Running Trivy security scan on Docker images...'
                         script {
-                            sh '''
-                                # Install Trivy if not present
-                                if ! command -v trivy &> /dev/null; then
-                                    curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-                                fi
+                            bat '''
+                                @echo off
+                                REM Install Trivy if not present
+                                where trivy >nul 2>&1
+                                if %errorlevel% neq 0 (
+                                    echo Installing Trivy...
+                                    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/aquasecurity/trivy/releases/latest/download/trivy_windows_amd64.zip' -OutFile 'trivy.zip'"
+                                    powershell -Command "Expand-Archive -Path 'trivy.zip' -DestinationPath '.' -Force"
+                                    move trivy.exe C:\Windows\System32\
+                                    del trivy.zip
+                                )
                                 
-                                # Scan all images
-                                trivy image --format json --output trivy-report.json ${PRODUCT_SERVICE_IMAGE}:${BUILD_TAG}
-                                trivy image --format json --output trivy-report-order.json ${ORDER_SERVICE_IMAGE}:${BUILD_TAG}
-                                trivy image --format json --output trivy-report-frontend.json ${FRONTEND_IMAGE}:${BUILD_TAG}
+                                REM Scan all images
+                                trivy image --format json --output trivy-report.json %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG%
+                                trivy image --format json --output trivy-report-order.json %ORDER_SERVICE_IMAGE%:%BUILD_TAG%
+                                trivy image --format json --output trivy-report-frontend.json %FRONTEND_IMAGE%:%BUILD_TAG%
                                 
-                                # Generate HTML reports
-                                trivy image --format template --template "@contrib/html.tpl" --output trivy-report.html ${PRODUCT_SERVICE_IMAGE}:${BUILD_TAG}
+                                REM Generate HTML reports
+                                trivy image --format template --template "@contrib/html.tpl" --output trivy-report.html %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG%
                             '''
                         }
                     }
@@ -275,14 +281,14 @@ pipeline {
                         echo 'Running Bandit security scan on Python code...'
                         script {
                             docker.image("${PRODUCT_SERVICE_IMAGE}:${BUILD_TAG}").inside() {
-                                sh '''
+                                bat '''
                                     cd /app
-                                    # Install bandit
+                                    REM Install bandit
                                     pip install bandit
                                     
-                                    # Run bandit scan
-                                    bandit -r . -f json -o bandit-report.json || true
-                                    bandit -r . -f html -o bandit-report.html || true
+                                    REM Run bandit scan
+                                    bandit -r . -f json -o bandit-report.json
+                                    bandit -r . -f html -o bandit-report.html
                                 '''
                             }
                         }
@@ -309,29 +315,29 @@ pipeline {
                 echo 'Deploying to test environment...'
                 script {
                     // Tag images for test environment
-                    sh '''
-                        docker tag ${PRODUCT_SERVICE_IMAGE}:${BUILD_TAG} ${PRODUCT_SERVICE_IMAGE}:test
-                        docker tag ${ORDER_SERVICE_IMAGE}:${BUILD_TAG} ${ORDER_SERVICE_IMAGE}:test
-                        docker tag ${FRONTEND_IMAGE}:${BUILD_TAG} ${FRONTEND_IMAGE}:test
+                    bat '''
+                        docker tag %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG% %PRODUCT_SERVICE_IMAGE%:test
+                        docker tag %ORDER_SERVICE_IMAGE%:%BUILD_TAG% %ORDER_SERVICE_IMAGE%:test
+                        docker tag %FRONTEND_IMAGE%:%BUILD_TAG% %FRONTEND_IMAGE%:test
                     '''
                     
                     // Deploy to test environment
-                    sh '''
-                        # Update docker-compose.test.yml with new image tags
-                        sed -i "s|image: .*product-service.*|image: ${PRODUCT_SERVICE_IMAGE}:test|g" docker-compose.test.yml
-                        sed -i "s|image: .*order-service.*|image: ${ORDER_SERVICE_IMAGE}:test|g" docker-compose.test.yml
-                        sed -i "s|image: .*frontend.*|image: ${FRONTEND_IMAGE}:test|g" docker-compose.test.yml
+                    bat '''
+                        REM Update docker-compose.test.yml with new image tags
+                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: .*product-service.*', 'image: %PRODUCT_SERVICE_IMAGE%:test' | Set-Content docker-compose.test.yml"
+                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: .*order-service.*', 'image: %ORDER_SERVICE_IMAGE%:test' | Set-Content docker-compose.test.yml"
+                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: .*frontend.*', 'image: %FRONTEND_IMAGE%:test' | Set-Content docker-compose.test.yml"
                         
-                        # Deploy to test environment
+                        REM Deploy to test environment
                         docker-compose -f docker-compose.test.yml up -d
                         
-                        # Wait for services to be healthy
-                        sleep 30
+                        REM Wait for services to be healthy
+                        timeout /t 30 /nobreak >nul 2>&1
                         
-                        # Run health checks
-                        curl -f http://localhost:8000/health || exit 1  # Product Service
-                        curl -f http://localhost:8001/health || exit 1  # Order Service
-                        curl -f http://localhost:3000/ || exit 1        # Frontend
+                        REM Run health checks
+                        curl -f http://localhost:8000/health
+                        curl -f http://localhost:8001/health
+                        curl -f http://localhost:3000/
                     '''
                 }
             }
@@ -364,42 +370,42 @@ pipeline {
                 echo 'Releasing to production environment...'
                 script {
                     // Tag images for production
-                    sh '''
-                        docker tag ${PRODUCT_SERVICE_IMAGE}:${BUILD_TAG} ${PRODUCT_SERVICE_IMAGE}:latest
-                        docker tag ${PRODUCT_SERVICE_IMAGE}:${BUILD_TAG} ${PRODUCT_SERVICE_IMAGE}:${BUILD_TAG}
-                        docker tag ${ORDER_SERVICE_IMAGE}:${BUILD_TAG} ${ORDER_SERVICE_IMAGE}:latest
-                        docker tag ${ORDER_SERVICE_IMAGE}:${BUILD_TAG} ${ORDER_SERVICE_IMAGE}:${BUILD_TAG}
-                        docker tag ${FRONTEND_IMAGE}:${BUILD_TAG} ${FRONTEND_IMAGE}:latest
-                        docker tag ${FRONTEND_IMAGE}:${BUILD_TAG} ${FRONTEND_IMAGE}:${BUILD_TAG}
+                    bat '''
+                        docker tag %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG% %PRODUCT_SERVICE_IMAGE%:latest
+                        docker tag %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG% %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG%
+                        docker tag %ORDER_SERVICE_IMAGE%:%BUILD_TAG% %ORDER_SERVICE_IMAGE%:latest
+                        docker tag %ORDER_SERVICE_IMAGE%:%BUILD_TAG% %ORDER_SERVICE_IMAGE%:%BUILD_TAG%
+                        docker tag %FRONTEND_IMAGE%:%BUILD_TAG% %FRONTEND_IMAGE%:latest
+                        docker tag %FRONTEND_IMAGE%:%BUILD_TAG% %FRONTEND_IMAGE%:%BUILD_TAG%
                     '''
                     
                     // Push to registry
-                    sh '''
-                        docker push ${PRODUCT_SERVICE_IMAGE}:latest
-                        docker push ${PRODUCT_SERVICE_IMAGE}:${BUILD_TAG}
-                        docker push ${ORDER_SERVICE_IMAGE}:latest
-                        docker push ${ORDER_SERVICE_IMAGE}:${BUILD_TAG}
-                        docker push ${FRONTEND_IMAGE}:latest
-                        docker push ${FRONTEND_IMAGE}:${BUILD_TAG}
+                    bat '''
+                        docker push %PRODUCT_SERVICE_IMAGE%:latest
+                        docker push %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG%
+                        docker push %ORDER_SERVICE_IMAGE%:latest
+                        docker push %ORDER_SERVICE_IMAGE%:%BUILD_TAG%
+                        docker push %FRONTEND_IMAGE%:latest
+                        docker push %FRONTEND_IMAGE%:%BUILD_TAG%
                     '''
                     
                     // Deploy to production
-                    sh '''
-                        # Update production docker-compose
-                        sed -i "s|image: .*product-service.*|image: ${PRODUCT_SERVICE_IMAGE}:latest|g" docker-compose.prod.yml
-                        sed -i "s|image: .*order-service.*|image: ${ORDER_SERVICE_IMAGE}:latest|g" docker-compose.prod.yml
-                        sed -i "s|image: .*frontend.*|image: ${FRONTEND_IMAGE}:latest|g" docker-compose.prod.yml
+                    bat '''
+                        REM Update production docker-compose
+                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: .*product-service.*', 'image: %PRODUCT_SERVICE_IMAGE%:latest' | Set-Content docker-compose.prod.yml"
+                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: .*order-service.*', 'image: %ORDER_SERVICE_IMAGE%:latest' | Set-Content docker-compose.prod.yml"
+                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: .*frontend.*', 'image: %FRONTEND_IMAGE%:latest' | Set-Content docker-compose.prod.yml"
                         
-                        # Deploy to production
+                        REM Deploy to production
                         docker-compose -f docker-compose.prod.yml up -d
                         
-                        # Wait for services to be healthy
-                        sleep 60
+                        REM Wait for services to be healthy
+                        timeout /t 60 /nobreak >nul 2>&1
                         
-                        # Run production health checks
-                        curl -f http://prod-server:8000/health || exit 1  # Product Service
-                        curl -f http://prod-server:8001/health || exit 1  # Order Service
-                        curl -f http://prod-server:3000/ || exit 1        # Frontend
+                        REM Run production health checks
+                        curl -f http://localhost:8000/health
+                        curl -f http://localhost:8001/health
+                        curl -f http://localhost:3000/
                     '''
                 }
             }
@@ -428,53 +434,51 @@ pipeline {
                 echo 'Setting up monitoring and alerting...'
                 script {
                     // Configure Prometheus monitoring
-                    sh '''
-                        # Update Prometheus configuration
-                        cat > prometheus/prometheus.yml << EOF
-                        global:
-                          scrape_interval: 15s
-                          evaluation_interval: 15s
-
-                        rule_files:
-                          - "alert_rules.yml"
-
-                        alerting:
-                          alertmanagers:
-                            - static_configs:
-                                - targets:
-                                  - alertmanager:9093
-
-                        scrape_configs:
-                          - job_name: 'product-service'
-                            static_configs:
-                              - targets: ['product-service:8000']
-                            metrics_path: '/metrics'
-                            scrape_interval: 5s
-                            
-                          - job_name: 'order-service'
-                            static_configs:
-                              - targets: ['order-service:8000']
-                            metrics_path: '/metrics'
-                            scrape_interval: 5s
-                            
-                          - job_name: 'postgres'
-                            static_configs:
-                              - targets: ['postgres-exporter:9187']
-                            
-                          - job_name: 'node-exporter'
-                            static_configs:
-                              - targets: ['node-exporter:9100']
-                        EOF
+                    bat '''
+                        REM Update Prometheus configuration
+                        echo global: > prometheus\prometheus.yml
+                        echo   scrape_interval: 15s >> prometheus\prometheus.yml
+                        echo   evaluation_interval: 15s >> prometheus\prometheus.yml
+                        echo. >> prometheus\prometheus.yml
+                        echo rule_files: >> prometheus\prometheus.yml
+                        echo   - "alert_rules.yml" >> prometheus\prometheus.yml
+                        echo. >> prometheus\prometheus.yml
+                        echo alerting: >> prometheus\prometheus.yml
+                        echo   alertmanagers: >> prometheus\prometheus.yml
+                        echo     - static_configs: >> prometheus\prometheus.yml
+                        echo         - targets: >> prometheus\prometheus.yml
+                        echo           - alertmanager:9093 >> prometheus\prometheus.yml
+                        echo. >> prometheus\prometheus.yml
+                        echo scrape_configs: >> prometheus\prometheus.yml
+                        echo   - job_name: 'product-service' >> prometheus\prometheus.yml
+                        echo     static_configs: >> prometheus\prometheus.yml
+                        echo       - targets: ['product-service:8000'] >> prometheus\prometheus.yml
+                        echo     metrics_path: '/metrics' >> prometheus\prometheus.yml
+                        echo     scrape_interval: 5s >> prometheus\prometheus.yml
+                        echo. >> prometheus\prometheus.yml
+                        echo   - job_name: 'order-service' >> prometheus\prometheus.yml
+                        echo     static_configs: >> prometheus\prometheus.yml
+                        echo       - targets: ['order-service:8000'] >> prometheus\prometheus.yml
+                        echo     metrics_path: '/metrics' >> prometheus\prometheus.yml
+                        echo     scrape_interval: 5s >> prometheus\prometheus.yml
+                        echo. >> prometheus\prometheus.yml
+                        echo   - job_name: 'postgres' >> prometheus\prometheus.yml
+                        echo     static_configs: >> prometheus\prometheus.yml
+                        echo       - targets: ['postgres-exporter:9187'] >> prometheus\prometheus.yml
+                        echo. >> prometheus\prometheus.yml
+                        echo   - job_name: 'node-exporter' >> prometheus\prometheus.yml
+                        echo     static_configs: >> prometheus\prometheus.yml
+                        echo       - targets: ['node-exporter:9100'] >> prometheus\prometheus.yml
                         
-                        # Start monitoring stack
+                        REM Start monitoring stack
                         docker-compose -f docker-compose.monitoring.yml up -d
                         
-                        # Wait for monitoring to be ready
-                        sleep 30
+                        REM Wait for monitoring to be ready
+                        timeout /t 30 /nobreak >nul 2>&1
                         
-                        # Verify monitoring is working
-                        curl -f http://localhost:9090/api/v1/targets || echo "Prometheus not ready yet"
-                        curl -f http://localhost:3000/api/health || echo "Grafana not ready yet"
+                        REM Verify monitoring is working
+                        curl -f http://localhost:9090/api/v1/targets
+                        curl -f http://localhost:3000/api/health
                     '''
                 }
             }
