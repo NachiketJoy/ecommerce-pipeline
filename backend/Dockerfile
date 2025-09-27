@@ -1,11 +1,14 @@
 FROM node:18-alpine
 
+# Install wget for health checks
+RUN apk add --no-cache wget
+
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
+# Install dependencies (including devDependencies for testing)
 RUN npm install
 
 # Copy application code

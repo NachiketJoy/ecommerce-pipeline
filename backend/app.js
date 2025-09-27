@@ -202,9 +202,15 @@ app.use((req, res) => {
     res.status(404).json({ detail: 'Endpoint not found' });
 });
 
-app.listen(PORT, () => {
-    console.log(`E-commerce API server running on port ${PORT}`);
-    console.log(`Health check: http://localhost:${PORT}/health`);
-    console.log(`Products: http://localhost:${PORT}/products/`);
-    console.log(`Orders: http://localhost:${PORT}/orders/`);
-});
+// Export app for testing
+module.exports = app;
+
+// Start server (always start for Docker containers)
+if (!module.parent) {
+    app.listen(PORT, () => {
+        console.log(`E-commerce API server running on port ${PORT}`);
+        console.log(`Health check: http://localhost:${PORT}/health`);
+        console.log(`Products: http://localhost:${PORT}/products/`);
+        console.log(`Orders: http://localhost:${PORT}/orders/`);
+    });
+}

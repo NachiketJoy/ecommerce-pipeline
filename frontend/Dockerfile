@@ -5,7 +5,7 @@ COPY index.html /usr/share/nginx/html/
 COPY main.js /usr/share/nginx/html/
 
 # Replace API URL placeholder with backend service URL
-RUN sed -i 's/_API_URL_/http:\/\/backend:8000/g' /usr/share/nginx/html/main.js
+RUN sed -i 's/_API_URL_/http:\/\/backend-test:8000/g' /usr/share/nginx/html/main.js
 
 # Create a simple nginx config
 RUN echo 'server { \
@@ -17,7 +17,7 @@ RUN echo 'server { \
         try_files $uri $uri/ /index.html; \
     } \
     location /api/ { \
-        proxy_pass http://backend:8000/; \
+        proxy_pass http://backend-test:8000/; \
         proxy_set_header Host $host; \
         proxy_set_header X-Real-IP $remote_addr; \
     } \

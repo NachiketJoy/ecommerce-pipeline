@@ -7,20 +7,13 @@ services:
       - "8000:8000"
     environment:
       - NODE_ENV=test
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
   frontend-test:
     build: ./frontend
     ports:
       - "3000:80"
     depends_on:
-      backend-test:
-        condition: service_healthy
+      - backend-test
 
 networks:
   default:

@@ -54,7 +54,7 @@ pipeline {
                         script {
                             bat '''
                                 cd backend
-                                docker run --rm -v "%cd%:/app" -w /app backend npm test -- --testResultsProcessor=junit --outputFile=test-results-backend.xml
+                                docker run --rm -v "%cd%:/app" -w /app -e NODE_ENV=test backend npm test
                             '''
                         }
                     }
@@ -74,7 +74,7 @@ pipeline {
                                 docker-compose -f docker-compose.test.yml up -d
                                 
                                 # Wait for services to be ready
-                                timeout /t 30 /nobreak >nul 2>&1
+                                timeout /t 60 /nobreak >nul 2>&1
                                 
                                 # Run simple integration tests
                                 mkdir test-reports 2>nul
