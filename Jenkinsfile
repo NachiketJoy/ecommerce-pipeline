@@ -7,9 +7,9 @@ pipeline {
         DOCKER_NAMESPACE = 'njoy10'
         
         // Application Configuration
-        PRODUCT_SERVICE_IMAGE = "${DOCKER_NAMESPACE}/product-service"
-        ORDER_SERVICE_IMAGE = "${DOCKER_NAMESPACE}/order-service"
-        FRONTEND_IMAGE = "${DOCKER_NAMESPACE}/frontend"
+    PRODUCT_SERVICE_IMAGE = "product-service"
+    ORDER_SERVICE_IMAGE = "order-service"
+    FRONTEND_IMAGE = "frontend"
         
         // Database Configuration
         POSTGRES_HOST = 'postgres-test'
@@ -316,17 +316,17 @@ pipeline {
                 script {
                     // Tag images for test environment
                     bat '''
-                        docker tag %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG% %PRODUCT_SERVICE_IMAGE%:test
-                        docker tag %ORDER_SERVICE_IMAGE%:%BUILD_TAG% %ORDER_SERVICE_IMAGE%:test
-                        docker tag %FRONTEND_IMAGE%:%BUILD_TAG% %FRONTEND_IMAGE%:test
+                        docker tag %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG% %DOCKER_NAMESPACE%/%PRODUCT_SERVICE_IMAGE%:test
+                        docker tag %ORDER_SERVICE_IMAGE%:%BUILD_TAG% %DOCKER_NAMESPACE%/%ORDER_SERVICE_IMAGE%:test
+                        docker tag %FRONTEND_IMAGE%:%BUILD_TAG% %DOCKER_NAMESPACE%/%FRONTEND_IMAGE%:test
                     '''
                     
                     // Deploy to test environment
                     bat '''
                         REM Update docker-compose.test.yml with new image tags
-                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: .*product-service.*', 'image: %PRODUCT_SERVICE_IMAGE%:test' | Set-Content docker-compose.test.yml"
-                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: .*order-service.*', 'image: %ORDER_SERVICE_IMAGE%:test' | Set-Content docker-compose.test.yml"
-                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: .*frontend.*', 'image: %FRONTEND_IMAGE%:test' | Set-Content docker-compose.test.yml"
+                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: .*product-service.*', 'image: %DOCKER_NAMESPACE%/%PRODUCT_SERVICE_IMAGE%:test' | Set-Content docker-compose.test.yml"
+                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: .*order-service.*', 'image: %DOCKER_NAMESPACE%/%ORDER_SERVICE_IMAGE%:test' | Set-Content docker-compose.test.yml"
+                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: .*frontend.*', 'image: %DOCKER_NAMESPACE%/%FRONTEND_IMAGE%:test' | Set-Content docker-compose.test.yml"
                         
                         REM Deploy to test environment
                         docker-compose -f docker-compose.test.yml up -d
@@ -371,30 +371,30 @@ pipeline {
                 script {
                     // Tag images for production
                     bat '''
-                        docker tag %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG% %PRODUCT_SERVICE_IMAGE%:latest
-                        docker tag %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG% %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG%
-                        docker tag %ORDER_SERVICE_IMAGE%:%BUILD_TAG% %ORDER_SERVICE_IMAGE%:latest
-                        docker tag %ORDER_SERVICE_IMAGE%:%BUILD_TAG% %ORDER_SERVICE_IMAGE%:%BUILD_TAG%
-                        docker tag %FRONTEND_IMAGE%:%BUILD_TAG% %FRONTEND_IMAGE%:latest
-                        docker tag %FRONTEND_IMAGE%:%BUILD_TAG% %FRONTEND_IMAGE%:%BUILD_TAG%
+                        docker tag %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG% %DOCKER_NAMESPACE%/%PRODUCT_SERVICE_IMAGE%:latest
+                        docker tag %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG% %DOCKER_NAMESPACE%/%PRODUCT_SERVICE_IMAGE%:%BUILD_TAG%
+                        docker tag %ORDER_SERVICE_IMAGE%:%BUILD_TAG% %DOCKER_NAMESPACE%/%ORDER_SERVICE_IMAGE%:latest
+                        docker tag %ORDER_SERVICE_IMAGE%:%BUILD_TAG% %DOCKER_NAMESPACE%/%ORDER_SERVICE_IMAGE%:%BUILD_TAG%
+                        docker tag %FRONTEND_IMAGE%:%BUILD_TAG% %DOCKER_NAMESPACE%/%FRONTEND_IMAGE%:latest
+                        docker tag %FRONTEND_IMAGE%:%BUILD_TAG% %DOCKER_NAMESPACE%/%FRONTEND_IMAGE%:%BUILD_TAG%
                     '''
                     
                     // Push to registry
                     bat '''
-                        docker push %PRODUCT_SERVICE_IMAGE%:latest
-                        docker push %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG%
-                        docker push %ORDER_SERVICE_IMAGE%:latest
-                        docker push %ORDER_SERVICE_IMAGE%:%BUILD_TAG%
-                        docker push %FRONTEND_IMAGE%:latest
-                        docker push %FRONTEND_IMAGE%:%BUILD_TAG%
+                        docker push %DOCKER_NAMESPACE%/%PRODUCT_SERVICE_IMAGE%:latest
+                        docker push %DOCKER_NAMESPACE%/%PRODUCT_SERVICE_IMAGE%:%BUILD_TAG%
+                        docker push %DOCKER_NAMESPACE%/%ORDER_SERVICE_IMAGE%:latest
+                        docker push %DOCKER_NAMESPACE%/%ORDER_SERVICE_IMAGE%:%BUILD_TAG%
+                        docker push %DOCKER_NAMESPACE%/%FRONTEND_IMAGE%:latest
+                        docker push %DOCKER_NAMESPACE%/%FRONTEND_IMAGE%:%BUILD_TAG%
                     '''
                     
                     // Deploy to production
                     bat '''
                         REM Update production docker-compose
-                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: .*product-service.*', 'image: %PRODUCT_SERVICE_IMAGE%:latest' | Set-Content docker-compose.prod.yml"
-                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: .*order-service.*', 'image: %ORDER_SERVICE_IMAGE%:latest' | Set-Content docker-compose.prod.yml"
-                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: .*frontend.*', 'image: %FRONTEND_IMAGE%:latest' | Set-Content docker-compose.prod.yml"
+                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: .*product-service.*', 'image: %DOCKER_NAMESPACE%/%PRODUCT_SERVICE_IMAGE%:latest' | Set-Content docker-compose.prod.yml"
+                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: .*order-service.*', 'image: %DOCKER_NAMESPACE%/%ORDER_SERVICE_IMAGE%:latest' | Set-Content docker-compose.prod.yml"
+                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: .*frontend.*', 'image: %DOCKER_NAMESPACE%/%FRONTEND_IMAGE%:latest' | Set-Content docker-compose.prod.yml"
                         
                         REM Deploy to production
                         docker-compose -f docker-compose.prod.yml up -d
