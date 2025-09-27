@@ -345,7 +345,7 @@ pipeline {
                     // Send notification to team
                     emailext (
                         subject: "Test Deployment Successful - Build ${BUILD_NUMBER}",
-                        body: "The application has been successfully deployed to the test environment.\n\nBuild: ${BUILD_NUMBER}\nCommit: ${GIT_COMMIT_SHORT}\nTest URLs:\n- Product Service: ${TEST_PRODUCT_SERVICE_URL}\n- Order Service: ${TEST_ORDER_SERVICE_URL}\n- Frontend: ${TEST_FRONTEND_URL}",
+                        body: "The application has been successfully deployed to the test environment.\n\nBuild: ${BUILD_NUMBER}\nCommit: ${env.GIT_COMMIT_SHORT ?: 'N/A'}\nTest URLs:\n- Product Service: ${TEST_PRODUCT_SERVICE_URL}\n- Order Service: ${TEST_ORDER_SERVICE_URL}\n- Frontend: ${TEST_FRONTEND_URL}",
                         to: "dev-team@company.com"
                     )
                 }
@@ -353,7 +353,7 @@ pipeline {
                     echo 'Test deployment failed!'
                     emailext (
                         subject: "Test Deployment Failed - Build ${BUILD_NUMBER}",
-                        body: "The test deployment has failed. Please check the Jenkins logs for details.\n\nBuild: ${BUILD_NUMBER}\nCommit: ${GIT_COMMIT_SHORT}",
+                        body: "The test deployment has failed. Please check the Jenkins logs for details.\n\nBuild: ${BUILD_NUMBER}\nCommit: ${env.GIT_COMMIT_SHORT ?: 'N/A'}",
                         to: "dev-team@company.com"
                     )
                 }
@@ -412,7 +412,7 @@ pipeline {
                     echo 'Production release successful!'
                     emailext (
                         subject: "Production Release Successful - Build ${BUILD_NUMBER}",
-                        body: "The application has been successfully released to production.\n\nBuild: ${BUILD_NUMBER}\nCommit: ${GIT_COMMIT_SHORT}\nProduction URLs:\n- Product Service: ${PROD_PRODUCT_SERVICE_URL}\n- Order Service: ${PROD_ORDER_SERVICE_URL}\n- Frontend: ${PROD_FRONTEND_URL}",
+                        body: "The application has been successfully released to production.\n\nBuild: ${BUILD_NUMBER}\nCommit: ${env.GIT_COMMIT_SHORT ?: 'N/A'}\nProduction URLs:\n- Product Service: ${PROD_PRODUCT_SERVICE_URL}\n- Order Service: ${PROD_ORDER_SERVICE_URL}\n- Frontend: ${PROD_FRONTEND_URL}",
                         to: "dev-team@company.com,ops-team@company.com"
                     )
                 }
@@ -420,7 +420,7 @@ pipeline {
                     echo 'Production release failed!'
                     emailext (
                         subject: "CRITICAL: Production Release Failed - Build ${BUILD_NUMBER}",
-                        body: "The production release has failed. Immediate attention required!\n\nBuild: ${BUILD_NUMBER}\nCommit: ${GIT_COMMIT_SHORT}",
+                        body: "The production release has failed. Immediate attention required!\n\nBuild: ${BUILD_NUMBER}\nCommit: ${env.GIT_COMMIT_SHORT ?: 'N/A'}",
                         to: "dev-team@company.com,ops-team@company.com,management@company.com"
                     )
                 }
@@ -507,7 +507,7 @@ pipeline {
             // Send failure notification
             emailext (
                 subject: "Pipeline Failed - Build ${BUILD_NUMBER}",
-                body: "The Jenkins pipeline has failed. Please check the logs for details.\n\nBuild: ${BUILD_NUMBER}\nCommit: ${GIT_COMMIT_SHORT}\nPipeline URL: ${BUILD_URL}",
+                body: "The Jenkins pipeline has failed. Please check the logs for details.\n\nBuild: ${BUILD_NUMBER}\nCommit: ${env.GIT_COMMIT_SHORT ?: 'N/A'}\nPipeline URL: ${BUILD_URL}",
                 to: "njoyekurun@gmail.com"
             )
         }
