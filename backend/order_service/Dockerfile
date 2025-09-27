@@ -1,6 +1,6 @@
 # week08/backend/order_service/Dockerfile
 
-FROM python:3.10-slim-buster
+FROM python:3.10-slim-bookworm
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
