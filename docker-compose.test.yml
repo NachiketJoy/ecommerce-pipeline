@@ -1,66 +1,20 @@
 
+# Simplified Test Environment - API Only
 
 services:
-  # Test Database for Product Service
-  product_db_test:
-    image: postgres:15-alpine
-    container_name: product_db_test_container
-    environment:
-      POSTGRES_DB: products_test
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5434:5432"
-    volumes:
-      - product_db_test_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d products_test"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - ecommerce_test_network
-
-  # Test Database for Order Service
-  order_db_test:
-    image: postgres:15-alpine
-    container_name: order_db_test_container
-    environment:
-      POSTGRES_DB: orders_test
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5435:5432"
-    volumes:
-      - order_db_test_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d orders_test"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - ecommerce_test_network
-
   # Product Service for Testing
   product-service-test:
-    image: product-service
+    image: simplified_product_service:latest
     container_name: product_service_test_container
     ports:
       - "8000:8000"
     environment:
-      POSTGRES_HOST: product_db_test
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: products_test
       AZURE_STORAGE_ACCOUNT_NAME: testaccount
       AZURE_STORAGE_ACCOUNT_KEY: testkey
       AZURE_STORAGE_CONTAINER_NAME: test-images
       AZURE_SAS_TOKEN_EXPIRY_HOURS: 1
     volumes:
       - ./test-reports:/app/test-reports
-    depends_on:
-      product_db_test:
-        condition: service_healthy
     networks:
       - ecommerce_test_network
     healthcheck:
@@ -71,21 +25,15 @@ services:
 
   # Order Service for Testing
   order-service-test:
-    image: order-service
+    image: simplified_order_service:latest
     container_name: order_service_test_container
     ports:
       - "8001:8000"
     environment:
-      POSTGRES_HOST: order_db_test
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: orders_test
       PRODUCT_SERVICE_URL: http://product-service-test:8000
     volumes:
       - ./test-reports:/app/test-reports
     depends_on:
-      order_db_test:
-        condition: service_healthy
       product-service-test:
         condition: service_healthy
     networks:
@@ -98,7 +46,7 @@ services:
 
   # Frontend for Testing
   frontend-test:
-    image: frontend
+    image: simplified_frontend:latest
     container_name: frontend_test_container
     ports:
       - "3000:80"
@@ -114,10 +62,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-
-volumes:
-  product_db_test_data:
-  order_db_test_data:
 
 networks:
   ecommerce_test_network:

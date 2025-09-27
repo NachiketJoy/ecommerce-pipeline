@@ -1,97 +1,22 @@
-# week08/backend/order_service/tests/test_main.py
+# Simplified Order Service Tests - API Only
 
 import logging
-import time
-from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
-from app.db import SessionLocal, engine, get_db
 from app.main import PRODUCT_SERVICE_URL, app
-from app.models import Base, Order, OrderItem
 from fastapi.testclient import TestClient
-from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import Session
 
-# Suppress noisy logs from SQLAlchemy/FastAPI/Uvicorn during tests for cleaner output
-logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+# Suppress noisy logs during tests for cleaner output
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
 logging.getLogger("fastapi").setLevel(logging.WARNING)
-logging.getLogger("app.main").setLevel(logging.WARNING)  # Suppress app's own info logs
-
-
-@pytest.fixture(scope="session", autouse=True)
-def setup_database_for_tests():
-    """Skip database setup for unit tests that don't need real database."""
-    # For unit tests, we'll mock the database connection
-    # Only run database setup if we're in integration test mode
-    if os.getenv('INTEGRATION_TEST_MODE'):
-        max_retries = 10
-        retry_delay_seconds = 3
-        for i in range(max_retries):
-            try:
-                logging.info(
-                    f"Order Service Tests: Attempting to connect to PostgreSQL for test setup (attempt {i+1}/{max_retries})..."
-                )
-                # Explicitly drop all tables first to ensure a clean slate for the session
-                Base.metadata.drop_all(bind=engine)
-                logging.info(
-                    "Order Service Tests: Successfully dropped all tables in PostgreSQL for test setup."
-                )
-
-                # Then create all tables required by the application
-                Base.metadata.create_all(bind=engine)
-                logging.info(
-                    "Order Service Tests: Successfully created all tables in PostgreSQL for test setup."
-                )
-                break
-            except OperationalError as e:
-                logging.warning(
-                    f"Order Service Tests: Test setup DB connection failed: {e}. Retrying in {retry_delay_seconds} seconds..."
-                )
-                time.sleep(retry_delay_seconds)
-                if i == max_retries - 1:
-                    pytest.fail(
-                        f"Could not connect to PostgreSQL for Order Service test setup after {max_retries} attempts: {e}"
-                    )
-            except Exception as e:
-                pytest.fail(
-                    f"Order Service Tests: An unexpected error occurred during test DB setup: {e}",
-                    pytrace=True,
-                )
-    else:
-        logging.info("Order Service Tests: Skipping database setup for unit tests")
-
-    yield
-
-
-@pytest.fixture(scope="function")
-def db_session_for_test():
-    connection = engine.connect()
-    transaction = connection.begin()
-    db = SessionLocal(bind=connection)
-
-    def override_get_db():
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-
-    try:
-        yield db
-    finally:
-        transaction.rollback()
-        db.close()
-        connection.close()
-        app.dependency_overrides.pop(get_db, None)
-
+logging.getLogger("app.main").setLevel(logging.WARNING)
 
 @pytest.fixture(scope="module")
 def client():
     with TestClient(app) as test_client:
         yield test_client
-
 
 @pytest.fixture(scope="function")
 def mock_httpx_client():
@@ -102,16 +27,269 @@ def mock_httpx_client():
         )
         yield mock_client_instance
 
-
 def test_read_root(client: TestClient):
     """Test the root endpoint."""
     response = client.get("/")
     assert response.status_code == 200
     assert response.json() == {"message": "Welcome to the Order Service!"}
 
-
 def test_health_check(client: TestClient):
     """Test the health check endpoint."""
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "service": "order-service"}
+
+def test_create_order_success(client: TestClient, mock_httpx_client):
+    """Test successful order creation with mocked product service."""
+    # Mock successful stock deduction response
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "product_id": 1,
+        "name": "Test Product",
+        "stock_quantity": 90,
+        "price": 10.0
+    }
+    mock_httpx_client.patch.return_value = mock_response
+
+    order_data = {
+        "user_id": 1,
+        "shipping_address": "123 Test St",
+        "items": [
+            {
+                "product_id": 1,
+                "quantity": 2,
+                "price_at_purchase": 10.0
+            }
+        ]
+    }
+
+    response = client.post("/orders/", json=order_data)
+    assert response.status_code == 201
+    response_data = response.json()
+    
+    assert response_data["user_id"] == 1
+    assert response_data["status"] == "confirmed"
+    assert response_data["total_amount"] == 20.0
+    assert len(response_data["items"]) == 1
+    assert response_data["items"][0]["product_id"] == 1
+    assert response_data["items"][0]["quantity"] == 2
+
+def test_create_order_empty_items(client: TestClient):
+    """Test order creation with no items."""
+    order_data = {
+        "user_id": 1,
+        "shipping_address": "123 Test St",
+        "items": []
+    }
+
+    response = client.post("/orders/", json=order_data)
+    assert response.status_code == 400
+    assert "Order must contain at least one item" in response.json()["detail"]
+
+def test_create_order_product_service_error(client: TestClient, mock_httpx_client):
+    """Test order creation when product service returns an error."""
+    # Mock product service error
+    mock_httpx_client.patch.side_effect = Exception("Product service unavailable")
+
+    order_data = {
+        "user_id": 1,
+        "shipping_address": "123 Test St",
+        "items": [
+            {
+                "product_id": 1,
+                "quantity": 2,
+                "price_at_purchase": 10.0
+            }
+        ]
+    }
+
+    response = client.post("/orders/", json=order_data)
+    assert response.status_code == 503
+    assert "Product Service is currently unavailable" in response.json()["detail"]
+
+def test_list_orders_empty(client: TestClient):
+    """Test listing orders when no orders exist."""
+    response = client.get("/orders/")
+    assert response.status_code == 200
+    assert response.json() == []
+
+def test_list_orders_with_data(client: TestClient, mock_httpx_client):
+    """Test listing orders when orders exist."""
+    # Mock successful stock deduction response
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "product_id": 1,
+        "name": "Test Product",
+        "stock_quantity": 90,
+        "price": 10.0
+    }
+    mock_httpx_client.patch.return_value = mock_response
+
+    # Create an order first
+    order_data = {
+        "user_id": 1,
+        "shipping_address": "123 Test St",
+        "items": [
+            {
+                "product_id": 1,
+                "quantity": 1,
+                "price_at_purchase": 10.0
+            }
+        ]
+    }
+    client.post("/orders/", json=order_data)
+
+    # List orders
+    response = client.get("/orders/")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+    assert len(response.json()) >= 1
+
+def test_get_order_success(client: TestClient, mock_httpx_client):
+    """Test getting a specific order by ID."""
+    # Mock successful stock deduction response
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "product_id": 1,
+        "name": "Test Product",
+        "stock_quantity": 90,
+        "price": 10.0
+    }
+    mock_httpx_client.patch.return_value = mock_response
+
+    # Create an order first
+    order_data = {
+        "user_id": 1,
+        "shipping_address": "123 Test St",
+        "items": [
+            {
+                "product_id": 1,
+                "quantity": 1,
+                "price_at_purchase": 10.0
+            }
+        ]
+    }
+    create_response = client.post("/orders/", json=order_data)
+    order_id = create_response.json()["order_id"]
+
+    # Get the order
+    response = client.get(f"/orders/{order_id}")
+    assert response.status_code == 200
+    response_data = response.json()
+    assert response_data["order_id"] == order_id
+    assert response_data["user_id"] == 1
+
+def test_get_order_not_found(client: TestClient):
+    """Test getting a non-existent order."""
+    response = client.get("/orders/99999")
+    assert response.status_code == 404
+
+def test_update_order_status_success(client: TestClient, mock_httpx_client):
+    """Test updating order status."""
+    # Mock successful stock deduction response
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "product_id": 1,
+        "name": "Test Product",
+        "stock_quantity": 90,
+        "price": 10.0
+    }
+    mock_httpx_client.patch.return_value = mock_response
+
+    # Create an order first
+    order_data = {
+        "user_id": 1,
+        "shipping_address": "123 Test St",
+        "items": [
+            {
+                "product_id": 1,
+                "quantity": 1,
+                "price_at_purchase": 10.0
+            }
+        ]
+    }
+    create_response = client.post("/orders/", json=order_data)
+    order_id = create_response.json()["order_id"]
+
+    # Update status
+    response = client.patch(f"/orders/{order_id}/status?new_status=shipped")
+    assert response.status_code == 200
+    response_data = response.json()
+    assert response_data["status"] == "shipped"
+
+def test_delete_order_success(client: TestClient, mock_httpx_client):
+    """Test deleting an order."""
+    # Mock successful stock deduction response
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "product_id": 1,
+        "name": "Test Product",
+        "stock_quantity": 90,
+        "price": 10.0
+    }
+    mock_httpx_client.patch.return_value = mock_response
+
+    # Create an order first
+    order_data = {
+        "user_id": 1,
+        "shipping_address": "123 Test St",
+        "items": [
+            {
+                "product_id": 1,
+                "quantity": 1,
+                "price_at_purchase": 10.0
+            }
+        ]
+    }
+    create_response = client.post("/orders/", json=order_data)
+    order_id = create_response.json()["order_id"]
+
+    # Delete the order
+    response = client.delete(f"/orders/{order_id}")
+    assert response.status_code == 204
+
+    # Verify order is no longer accessible
+    get_response = client.get(f"/orders/{order_id}")
+    assert get_response.status_code == 404
+
+def test_get_order_items_success(client: TestClient, mock_httpx_client):
+    """Test getting order items."""
+    # Mock successful stock deduction response
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "product_id": 1,
+        "name": "Test Product",
+        "stock_quantity": 90,
+        "price": 10.0
+    }
+    mock_httpx_client.patch.return_value = mock_response
+
+    # Create an order first
+    order_data = {
+        "user_id": 1,
+        "shipping_address": "123 Test St",
+        "items": [
+            {
+                "product_id": 1,
+                "quantity": 2,
+                "price_at_purchase": 10.0
+            }
+        ]
+    }
+    create_response = client.post("/orders/", json=order_data)
+    order_id = create_response.json()["order_id"]
+
+    # Get order items
+    response = client.get(f"/orders/{order_id}/items")
+    assert response.status_code == 200
+    response_data = response.json()
+    assert isinstance(response_data, list)
+    assert len(response_data) == 1
+    assert response_data[0]["product_id"] == 1
+    assert response_data[0]["quantity"] == 2

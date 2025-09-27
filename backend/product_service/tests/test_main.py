@@ -1,92 +1,18 @@
-# week08/backend/product_service/tests/test_main.py
+# Simplified Product Service Tests - API Only
 
 import logging
 import os
-import time
 from unittest.mock import MagicMock, patch
 
 import pytest
-from app.db import SessionLocal, engine, get_db
 from app.main import app
-from app.models import Base, Product
-
 from fastapi.testclient import TestClient
-from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import Session
 
-# Suppress noisy logs from SQLAlchemy/FastAPI during tests for cleaner output
-logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+# Suppress noisy logs during tests for cleaner output
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
 logging.getLogger("fastapi").setLevel(logging.WARNING)
-logging.getLogger("app.main").setLevel(logging.WARNING)  # Suppress app's own info logs
-
-
-# --- Pytest Fixtures ---
-@pytest.fixture(scope="session", autouse=True)
-def setup_database_for_tests():
-    """Skip database setup for unit tests that don't need real database."""
-    # For unit tests, we'll mock the database connection
-    # Only run database setup if we're in integration test mode
-    if os.getenv('INTEGRATION_TEST_MODE'):
-        max_retries = 10
-        retry_delay_seconds = 3
-        for i in range(max_retries):
-            try:
-                logging.info(
-                    f"Product Service Tests: Attempting to connect to PostgreSQL for test setup (attempt {i+1}/{max_retries})..."
-                )
-                # Explicitly drop all tables first to ensure a clean slate for the session
-                Base.metadata.drop_all(bind=engine)
-                logging.info(
-                    "Product Service Tests: Successfully dropped all tables in PostgreSQL for test setup."
-                )
-
-                # Then create all tables required by the application
-                Base.metadata.create_all(bind=engine)
-                logging.info(
-                    "Product Service Tests: Successfully created all tables in PostgreSQL for test setup."
-                )
-                break
-            except OperationalError as e:
-                logging.warning(
-                    f"Product Service Tests: Test setup DB connection failed: {e}. Retrying in {retry_delay_seconds} seconds..."
-                )
-                time.sleep(retry_delay_seconds)
-                if i == max_retries - 1:
-                    pytest.fail(
-                        f"Could not connect to PostgreSQL for Product Service test setup after {max_retries} attempts: {e}"
-                    )
-            except Exception as e:
-                pytest.fail(
-                    f"Product Service Tests: An unexpected error occurred during test DB setup: {e}",
-                    pytrace=True,
-                )
-    else:
-        logging.info("Product Service Tests: Skipping database setup for unit tests")
-
-    yield
-
-
-@pytest.fixture(scope="function")
-def db_session_for_test():
-    connection = engine.connect()
-    transaction = connection.begin()
-    db = SessionLocal(bind=connection)
-
-    def override_get_db():
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-
-    try:
-        yield db
-    finally:
-        transaction.rollback()
-        db.close()
-        connection.close()
-        app.dependency_overrides.pop(get_db, None)
-
+logging.getLogger("app.main").setLevel(logging.WARNING)
 
 @pytest.fixture(scope="module")
 def client():
@@ -103,7 +29,6 @@ def client():
     del os.environ["AZURE_STORAGE_ACCOUNT_KEY"]
     del os.environ["AZURE_STORAGE_CONTAINER_NAME"]
     del os.environ["AZURE_SAS_TOKEN_EXPIRY_HOURS"]
-
 
 @pytest.fixture(scope="function", autouse=True)
 def mock_azure_blob_storage():
@@ -136,11 +61,9 @@ def mock_azure_blob_storage():
         # Mock generate_blob_sas
         with patch("app.main.generate_blob_sas") as mock_generate_blob_sas:
             mock_generate_blob_sas.return_value = "sv=2021-08-01&st=2024-01-01T00%3A00%3A00Z&se=2024-01-01T01%3A00%3A00Z&sr=b&sp=r&sig=mock_sas_token"
-            yield mock_blob_service_client  # Yield the mock object for potential assertions
-
+            yield mock_blob_service_client
 
 # --- Product Service Tests ---
-
 
 def test_read_root(client: TestClient):
     """Test the root endpoint."""
@@ -148,18 +71,16 @@ def test_read_root(client: TestClient):
     assert response.status_code == 200
     assert response.json() == {"message": "Welcome to the Product Service!"}
 
-
 def test_health_check(client: TestClient):
     """Test the health check endpoint."""
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "service": "product-service"}
 
-
-def test_create_product_success(client: TestClient, db_session_for_test: Session):
+def test_create_product_success(client: TestClient):
     """
     Tests successful creation of a product via POST /products/.
-    Verifies status code, response data, and database entry, including optional image_url.
+    Verifies status code, response data, and in-memory storage.
     """
     test_data = {
         "name": "New Test Product",
@@ -176,26 +97,12 @@ def test_create_product_success(client: TestClient, db_session_for_test: Session
     # Assert response fields match input and generated fields exist
     assert response_data["name"] == test_data["name"]
     assert response_data["description"] == test_data["description"]
-    assert (
-        float(response_data["price"]) == test_data["price"]
-    )  # Convert to float for comparison
+    assert float(response_data["price"]) == test_data["price"]
     assert response_data["stock_quantity"] == test_data["stock_quantity"]
     assert response_data["image_url"] == test_data["image_url"]
     assert "product_id" in response_data
     assert isinstance(response_data["product_id"], int)
     assert "created_at" in response_data
-    assert "updated_at" in response_data
-
-    # Verify the product exists in the database using the test session
-    db_product = (
-        db_session_for_test.query(Product)
-        .filter(Product.product_id == response_data["product_id"])
-        .first()
-    )
-    assert db_product is not None
-    assert db_product.name == test_data["name"]
-    assert db_product.image_url == test_data["image_url"]
-
 
 def test_list_products_empty(client: TestClient):
     """
@@ -205,13 +112,11 @@ def test_list_products_empty(client: TestClient):
     assert response.status_code == 200
     assert response.json() == []
 
-
-def test_list_products_with_data(client: TestClient, db_session_for_test: Session):
+def test_list_products_with_data(client: TestClient):
     """
     Tests listing products when products exist, verifying the list structure.
-    A product is created via API to ensure it's present.
     """
-    # Create a product via API within the test's transaction
+    # Create a product via API
     product_data = {
         "name": "List Product Example",
         "description": "For list test",
@@ -224,10 +129,57 @@ def test_list_products_with_data(client: TestClient, db_session_for_test: Sessio
     response = client.get("/products/")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
-    assert len(response.json()) >= 1  # Should contain the product we just added
+    assert len(response.json()) >= 1
 
+def test_get_product_success(client: TestClient):
+    """Test getting a specific product by ID."""
+    # Create a product first
+    product_data = {
+        "name": "Test Product",
+        "description": "Test description",
+        "price": 10.0,
+        "stock_quantity": 5,
+    }
+    create_response = client.post("/products/", json=product_data)
+    product_id = create_response.json()["product_id"]
 
-def test_delete_product_success(client: TestClient, db_session_for_test: Session):
+    # Get the product
+    response = client.get(f"/products/{product_id}")
+    assert response.status_code == 200
+    response_data = response.json()
+    assert response_data["product_id"] == product_id
+    assert response_data["name"] == product_data["name"]
+
+def test_get_product_not_found(client: TestClient):
+    """Test getting a non-existent product."""
+    response = client.get("/products/99999")
+    assert response.status_code == 404
+
+def test_update_product_success(client: TestClient):
+    """Test updating a product."""
+    # Create a product first
+    product_data = {
+        "name": "Original Product",
+        "description": "Original description",
+        "price": 10.0,
+        "stock_quantity": 5,
+    }
+    create_response = client.post("/products/", json=product_data)
+    product_id = create_response.json()["product_id"]
+
+    # Update the product
+    update_data = {
+        "name": "Updated Product",
+        "price": 15.0,
+    }
+    response = client.put(f"/products/{product_id}", json=update_data)
+    assert response.status_code == 200
+    response_data = response.json()
+    assert response_data["name"] == "Updated Product"
+    assert response_data["price"] == 15.0
+    assert response_data["description"] == "Original description"  # Should remain unchanged
+
+def test_delete_product_success(client: TestClient):
     """
     Tests successful deletion of a product.
     """
@@ -247,14 +199,43 @@ def test_delete_product_success(client: TestClient, db_session_for_test: Session
     response = client.delete(f"/products/{product_id}")
     assert response.status_code == 204  # No content on successful delete
 
-    # Verify product is no longer in DB via GET attempt
+    # Verify product is no longer accessible
     get_response = client.get(f"/products/{product_id}")
     assert get_response.status_code == 404
 
-    # Verify directly with DB session (cleaner for confirming actual deletion)
-    deleted_product_in_db = (
-        db_session_for_test.query(Product)
-        .filter(Product.product_id == product_id)
-        .first()
-    )
-    assert deleted_product_in_db is None
+def test_deduct_stock_success(client: TestClient):
+    """Test successful stock deduction."""
+    # Create a product with stock
+    product_data = {
+        "name": "Stock Test Product",
+        "description": "For stock testing",
+        "price": 10.0,
+        "stock_quantity": 100,
+    }
+    create_response = client.post("/products/", json=product_data)
+    product_id = create_response.json()["product_id"]
+
+    # Deduct stock
+    deduct_data = {"quantity_to_deduct": 10}
+    response = client.patch(f"/products/{product_id}/deduct-stock", json=deduct_data)
+    assert response.status_code == 200
+    response_data = response.json()
+    assert response_data["stock_quantity"] == 90
+
+def test_deduct_stock_insufficient(client: TestClient):
+    """Test stock deduction with insufficient stock."""
+    # Create a product with limited stock
+    product_data = {
+        "name": "Limited Stock Product",
+        "description": "For stock testing",
+        "price": 10.0,
+        "stock_quantity": 5,
+    }
+    create_response = client.post("/products/", json=product_data)
+    product_id = create_response.json()["product_id"]
+
+    # Try to deduct more than available
+    deduct_data = {"quantity_to_deduct": 10}
+    response = client.patch(f"/products/{product_id}/deduct-stock", json=deduct_data)
+    assert response.status_code == 400
+    assert "Insufficient stock" in response.json()["detail"]

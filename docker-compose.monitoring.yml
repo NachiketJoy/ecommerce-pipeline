@@ -90,19 +90,15 @@ services:
     networks:
       - monitoring_network
 
-  # Postgres Exporter for Database Metrics
-  postgres-exporter:
-    image: prometheuscommunity/postgres-exporter:latest
-    container_name: postgres-exporter
+  # Application Metrics Exporter (Custom)
+  app-exporter:
+    image: prom/node-exporter:latest
+    container_name: app-exporter
     restart: always
     ports:
-      - "9187:9187"
-    environment:
-      DATA_SOURCE_NAME: "postgresql://postgres:postgres@product_db_prod:5432/products?sslmode=disable"
+      - "9187:9100"
     networks:
       - monitoring_network
-    depends_on:
-      - product_db_prod
 
   # cAdvisor for Container Metrics
   cadvisor:

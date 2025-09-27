@@ -11,12 +11,8 @@ pipeline {
     ORDER_SERVICE_IMAGE = "order-service"
     FRONTEND_IMAGE = "frontend"
         
-        // Database Configuration
-        POSTGRES_HOST = 'postgres-test'
-        POSTGRES_USER = 'postgres'
-        POSTGRES_PASSWORD = 'postgres'
-        PRODUCT_DB_NAME = 'products'
-        ORDER_DB_NAME = 'orders'
+        // Simplified Configuration (No Database)
+        // Services use in-memory storage
         
         // Azure Configuration (for production)
         AZURE_STORAGE_ACCOUNT_NAME = credentials('azure-storage-account-name')
@@ -113,7 +109,7 @@ pipeline {
                         script {
                             bat '''
                                 cd backend/product_service
-                                docker run --rm -v "%WORKSPACE%\\backend\\product_service:/app" -w /app product-service python -m pytest tests/test_main.py::test_read_root tests/test_main.py::test_health_check -v --tb=short --junitxml=test-results-product.xml --cov=app --cov-report=xml --cov-report=html
+                                docker run --rm -v "%WORKSPACE%\\backend\\product_service:/app" -w /app product-service python -m pytest tests/test_main.py -v --tb=short --junitxml=test-results-product.xml --cov=app --cov-report=xml --cov-report=html
                             '''
                         }
                     }
@@ -130,7 +126,7 @@ pipeline {
                         script {
                             bat '''
                                 cd backend/order_service
-                                docker run --rm -v "%WORKSPACE%\\backend\\order_service:/app" -w /app order-service python -m pytest tests/test_main.py::test_read_root tests/test_main.py::test_health_check -v --tb=short --junitxml=test-results-order.xml --cov=app --cov-report=xml --cov-report=html
+                                docker run --rm -v "%WORKSPACE%\\backend\\order_service:/app" -w /app order-service python -m pytest tests/test_main.py -v --tb=short --junitxml=test-results-order.xml --cov=app --cov-report=xml --cov-report=html
                             '''
                         }
                     }
@@ -162,22 +158,20 @@ pipeline {
                             
                             // Run integration tests for Product Service
                             bat '''
-                                docker run --rm --network task73hd_ecommerce_test_network ^
+                                docker run --rm --network simplified_ecommerce_test_network ^
                                     -v "%WORKSPACE%\\test-reports:/app/test-reports" ^
                                     -e PRODUCT_SERVICE_URL=http://product-service-test:8000 ^
                                     -e ORDER_SERVICE_URL=http://order-service-test:8000 ^
-                                    -e INTEGRATION_TEST_MODE=true ^
                                     product-service ^
                                     python -m pytest tests/integration/test_product_integration.py -v --junitxml=/app/test-reports/integration-test-results-product.xml
                             '''
                             
                             // Run integration tests for Order Service
                             bat '''
-                                docker run --rm --network task73hd_ecommerce_test_network ^
+                                docker run --rm --network simplified_ecommerce_test_network ^
                                     -v "%WORKSPACE%\\test-reports:/app/test-reports" ^
                                     -e PRODUCT_SERVICE_URL=http://product-service-test:8000 ^
                                     -e ORDER_SERVICE_URL=http://order-service-test:8000 ^
-                                    -e INTEGRATION_TEST_MODE=true ^
                                     order-service ^
                                     python -m pytest tests/integration/test_order_integration.py -v --junitxml=/app/test-reports/integration-test-results-order.xml
                             '''
@@ -328,9 +322,9 @@ pipeline {
                     // Deploy to test environment
                     bat '''
                         REM Update docker-compose.test.yml with new image tags
-                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: product-service', 'image: %DOCKER_NAMESPACE%/product-service:test' | Set-Content docker-compose.test.yml"
-                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: order-service', 'image: %DOCKER_NAMESPACE%/order-service:test' | Set-Content docker-compose.test.yml"
-                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: frontend', 'image: %DOCKER_NAMESPACE%/frontend:test' | Set-Content docker-compose.test.yml"
+                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: simplified_product_service:latest', 'image: %DOCKER_NAMESPACE%/product-service:test' | Set-Content docker-compose.test.yml"
+                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: simplified_order_service:latest', 'image: %DOCKER_NAMESPACE%/order-service:test' | Set-Content docker-compose.test.yml"
+                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: simplified_frontend:latest', 'image: %DOCKER_NAMESPACE%/frontend:test' | Set-Content docker-compose.test.yml"
                         
                         REM Deploy to test environment
                         docker-compose -f docker-compose.test.yml up -d
@@ -396,9 +390,9 @@ pipeline {
                     // Deploy to production
                     bat '''
                         REM Update production docker-compose
-                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: .*product-service.*', 'image: %DOCKER_NAMESPACE%/product-service:latest' | Set-Content docker-compose.prod.yml"
-                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: .*order-service.*', 'image: %DOCKER_NAMESPACE%/order-service:latest' | Set-Content docker-compose.prod.yml"
-                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: .*frontend.*', 'image: %DOCKER_NAMESPACE%/frontend:latest' | Set-Content docker-compose.prod.yml"
+                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: ecommerce/product-service:latest', 'image: %DOCKER_NAMESPACE%/product-service:latest' | Set-Content docker-compose.prod.yml"
+                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: ecommerce/order-service:latest', 'image: %DOCKER_NAMESPACE%/order-service:latest' | Set-Content docker-compose.prod.yml"
+                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: ecommerce/frontend:latest', 'image: %DOCKER_NAMESPACE%/frontend:latest' | Set-Content docker-compose.prod.yml"
                         
                         REM Deploy to production
                         docker-compose -f docker-compose.prod.yml up -d
@@ -466,9 +460,9 @@ pipeline {
                         echo     metrics_path: '/metrics' >> prometheus\\prometheus.yml
                         echo     scrape_interval: 5s >> prometheus\\prometheus.yml
                         echo. >> prometheus\\prometheus.yml
-                        echo   - job_name: 'postgres' >> prometheus\\prometheus.yml
+                        echo   - job_name: 'app-metrics' >> prometheus\\prometheus.yml
                         echo     static_configs: >> prometheus\\prometheus.yml
-                        echo       - targets: ['postgres-exporter:9187'] >> prometheus\\prometheus.yml
+                        echo       - targets: ['app-exporter:9100'] >> prometheus\\prometheus.yml
                         echo. >> prometheus\\prometheus.yml
                         echo   - job_name: 'node-exporter' >> prometheus\\prometheus.yml
                         echo     static_configs: >> prometheus\\prometheus.yml

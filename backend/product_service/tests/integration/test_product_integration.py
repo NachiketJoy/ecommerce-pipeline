@@ -1,4 +1,4 @@
-# week08/backend/product_service/tests/integration/test_product_integration.py
+# Simplified Product Service Integration Tests - API Only
 
 import logging
 import os
@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 # Suppress noisy logs during integration tests
-logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
 logging.getLogger("fastapi").setLevel(logging.WARNING)

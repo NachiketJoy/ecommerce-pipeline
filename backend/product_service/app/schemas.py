@@ -1,8 +1,8 @@
-# week08/backend/product_service/app/schemas.py
+# Simplified Product Service Schemas - API Only
 
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 
 class ProductBase(BaseModel):
@@ -31,9 +31,6 @@ class ProductUpdate(ProductBase):
 class ProductResponse(ProductBase):
     product_id: int
     created_at: datetime
-    updated_at: Optional[datetime] = None
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 class StockDeductRequest(BaseModel):

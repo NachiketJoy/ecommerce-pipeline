@@ -1,8 +1,8 @@
-# week08/backend/order_service/app/schemas.py
+# Simplified Order Service Schemas - API Only
 
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 
 class OrderItemBase(BaseModel):
@@ -21,12 +21,9 @@ class OrderItemCreate(OrderItemBase):
 
 class OrderItemResponse(OrderItemBase):
     order_item_id: int
-    order_id: int  # The ID of the parent order
-    item_total: float  # Calculated total for this specific item
+    order_id: int
+    item_total: float
     created_at: datetime
-    updated_at: Optional[datetime] = None
-
-    model_config = ConfigDict(from_attributes=True)  # Enable ORM mode for Pydantic V2
 
 
 class OrderBase(BaseModel):
@@ -56,7 +53,4 @@ class OrderResponse(OrderBase):
     order_date: datetime
     total_amount: float
     created_at: datetime
-    updated_at: Optional[datetime] = None
-    items: List[OrderItemResponse] = []  # Nested items for detailed order response
-
-    model_config = ConfigDict(from_attributes=True)  # Enable ORM mode for Pydantic V2
+    items: List[OrderItemResponse] = []

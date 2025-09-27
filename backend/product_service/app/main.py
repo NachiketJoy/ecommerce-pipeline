@@ -1,11 +1,9 @@
-# week08/backend/product_service/app/main.py
+# Simplified Product Service - API Only
 
 import logging
 import os
 import sys
-import time
 from datetime import datetime, timedelta
-from decimal import Decimal
 from typing import List, Optional
 from urllib.parse import urlparse
 
@@ -17,7 +15,6 @@ from azure.storage.blob import (
     generate_blob_sas,
 )
 from fastapi import (
-    Depends,
     FastAPI,
     File,
     Form,
@@ -28,11 +25,7 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import Session
 
-from .db import Base, engine, get_db
-from .models import Product
 from .schemas import ProductCreate, ProductResponse, ProductUpdate, StockDeductRequest
 
 # --- Standard Logging Configuration ---
@@ -87,8 +80,11 @@ else:
     )
     blob_service_client = None
 
-
 RESTOCK_THRESHOLD = 5  # Threshold for restock notification
+
+# In-memory storage for products
+products_db = {}
+next_product_id = 1
 
 # --- FastAPI Application Setup ---
 app = FastAPI(
@@ -106,53 +102,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# --- FastAPI Event Handlers ---
-@app.on_event("startup")
-async def startup_event():
-    max_retries = 10
-    retry_delay_seconds = 5
-    for i in range(max_retries):
-        try:
-            logger.info(
-                f"Product Service: Attempting to connect to PostgreSQL and create tables (attempt {i+1}/{max_retries})..."
-            )
-            Base.metadata.create_all(bind=engine)
-            logger.info(
-                "Product Service: Successfully connected to PostgreSQL and ensured tables exist."
-            )
-            break  # Exit loop if successful
-        except OperationalError as e:
-            logger.warning(f"Product Service: Failed to connect to PostgreSQL: {e}")
-            if i < max_retries - 1:
-                logger.info(
-                    f"Product Service: Retrying in {retry_delay_seconds} seconds..."
-                )
-                time.sleep(retry_delay_seconds)
-            else:
-                logger.critical(
-                    f"Product Service: Failed to connect to PostgreSQL after {max_retries} attempts. Exiting application."
-                )
-                sys.exit(1)  # Critical failure: exit if DB connection is unavailable
-        except Exception as e:
-            logger.critical(
-                f"Product Service: An unexpected error occurred during database startup: {e}",
-                exc_info=True,
-            )
-            sys.exit(1)
-
-
 # --- Root Endpoint ---
 @app.get("/", status_code=status.HTTP_200_OK, summary="Root endpoint")
 async def read_root():
     return {"message": "Welcome to the Product Service!"}
 
-
 # --- Health Check Endpoint ---
 @app.get("/health", status_code=status.HTTP_200_OK, summary="Health check endpoint")
 async def health_check():
     return {"status": "ok", "service": "product-service"}
-
 
 @app.post(
     "/products/",
@@ -160,28 +118,24 @@ async def health_check():
     status_code=status.HTTP_201_CREATED,
     summary="Create a new product",
 )
-async def create_product(product: ProductCreate, db: Session = Depends(get_db)):
+async def create_product(product: ProductCreate):
     """
-    Creates a new product in the database.
+    Creates a new product in memory.
     """
+    global next_product_id
     logger.info(f"Product Service: Creating product: {product.name}")
-    try:
-        db_product = Product(**product.model_dump())
-        db.add(db_product)
-        db.commit()
-        db.refresh(db_product)
-        logger.info(
-            f"Product Service: Product '{db_product.name}' (ID: {db_product.product_id}) created successfully."
-        )
-        return db_product
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Product Service: Error creating product: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not create product.",
-        )
-
+    
+    product_data = product.model_dump()
+    product_data["product_id"] = next_product_id
+    product_data["created_at"] = datetime.now()
+    
+    products_db[next_product_id] = product_data
+    next_product_id += 1
+    
+    logger.info(
+        f"Product Service: Product '{product_data['name']}' (ID: {product_data['product_id']}) created successfully."
+    )
+    return ProductResponse(**product_data)
 
 @app.get(
     "/products/",
@@ -189,7 +143,6 @@ async def create_product(product: ProductCreate, db: Session = Depends(get_db)):
     summary="Retrieve a list of all products",
 )
 def list_products(
-    db: Session = Depends(get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
     search: Optional[str] = Query(None, max_length=255),
@@ -200,54 +153,57 @@ def list_products(
     logger.info(
         f"Product Service: Listing products with skip={skip}, limit={limit}, search='{search}'"
     )
-    query = db.query(Product)
+    
+    products = list(products_db.values())
+    
     if search:
-        search_pattern = f"%{search}%"
+        search_pattern = search.lower()
         logger.info(f"Product Service: Applying search filter for term: {search}")
-        query = query.filter(
-            (Product.name.ilike(search_pattern))
-            | (Product.description.ilike(search_pattern))
-        )
-    products = query.offset(skip).limit(limit).all()
-
+        products = [
+            p for p in products 
+            if search_pattern in p["name"].lower() or 
+               (p["description"] and search_pattern in p["description"].lower())
+        ]
+    
+    # Apply pagination
+    products = products[skip:skip + limit]
+    
     logger.info(
         f"Product Service: Retrieved {len(products)} products (skip={skip}, limit={limit})."
     )
-    return products
-
+    return [ProductResponse(**product) for product in products]
 
 @app.get(
     "/products/{product_id}",
     response_model=ProductResponse,
     summary="Retrieve a single product by ID",
 )
-def get_product(product_id: int, db: Session = Depends(get_db)):
+def get_product(product_id: int):
     logger.info(f"Product Service: Fetching product with ID: {product_id}")
-    product = db.query(Product).filter(Product.product_id == product_id).first()
-    if not product:
+    
+    if product_id not in products_db:
         logger.warning(f"Product Service: Product with ID {product_id} not found.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
         )
+    
+    product = products_db[product_id]
     logger.info(
-        f"Product Service: Retrieved product with ID {product_id}. Name: {product.name}"
+        f"Product Service: Retrieved product with ID {product_id}. Name: {product['name']}"
     )
-    return product
-
+    return ProductResponse(**product)
 
 @app.put(
     "/products/{product_id}",
     response_model=ProductResponse,
     summary="Update an existing product by ID",
 )
-async def update_product(
-    product_id: int, product: ProductUpdate, db: Session = Depends(get_db)
-):
+async def update_product(product_id: int, product: ProductUpdate):
     logger.info(
         f"Product Service: Updating product with ID: {product_id} with data: {product.model_dump(exclude_unset=True)}"
     )
-    db_product = db.query(Product).filter(Product.product_id == product_id).first()
-    if not db_product:
+    
+    if product_id not in products_db:
         logger.warning(
             f"Product Service: Attempted to update non-existent product with ID {product_id}."
         )
@@ -257,38 +213,24 @@ async def update_product(
 
     update_data = product.model_dump(exclude_unset=True)
     for key, value in update_data.items():
-        setattr(db_product, key, value)
+        products_db[product_id][key] = value
 
-    try:
-        db.add(db_product)  # Mark for update
-        db.commit()
-        db.refresh(db_product)
-        logger.info(f"Product Service: Product {product_id} updated successfully.")
-        return db_product
-    except Exception as e:
-        db.rollback()
-        logger.error(
-            f"Product Service: Error updating product {product_id}: {e}", exc_info=True
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not update product.",
-        )
-
+    logger.info(f"Product Service: Product {product_id} updated successfully.")
+    return ProductResponse(**products_db[product_id])
 
 @app.delete(
     "/products/{product_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a product by ID",
 )
-def delete_product(product_id: int, db: Session = Depends(get_db)):
+def delete_product(product_id: int):
     """
-    Deletes a product record from the database.
+    Deletes a product record from memory.
     Does NOT delete the image from Azure Blob Storage.
     """
     logger.info(f"Product Service: Attempting to delete product with ID: {product_id}")
-    product = db.query(Product).filter(Product.product_id == product_id).first()
-    if not product:
+    
+    if product_id not in products_db:
         logger.warning(
             f"Product Service: Attempted to delete non-existent product with ID {product_id}."
         )
@@ -296,23 +238,13 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
         )
 
-    try:
-        db.delete(product)
-        db.commit()
-        logger.info(
-            f"Product Service: Product {product_id} deleted successfully. Name: {product.name}"
-        )
-    except Exception as e:
-        db.rollback()
-        logger.error(
-            f"Product Service: Error deleting product {product_id}: {e}", exc_info=True
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred while deleting the product.",
-        )
+    product_name = products_db[product_id]["name"]
+    del products_db[product_id]
+    
+    logger.info(
+        f"Product Service: Product {product_id} deleted successfully. Name: {product_name}"
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
 
 @app.post(
     "/products/{product_id}/upload-image",
@@ -320,10 +252,10 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
     summary="Upload an image for a product to Azure Blob Storage",
 )
 async def upload_product_image(
-    product_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)
+    product_id: int, file: UploadFile = File(...)
 ):
     """
-    Uploads an image file to Azure Blob Storage and updates the product's image_url in the database.
+    Uploads an image file to Azure Blob Storage and updates the product's image_url in memory.
     Generates a SAS token for the image URL with a defined expiry.
     Only supports image file types.
     """
@@ -333,8 +265,7 @@ async def upload_product_image(
             detail="Azure Blob Storage is not configured or available.",
         )
 
-    db_product = db.query(Product).filter(Product.product_id == product_id).first()
-    if not db_product:
+    if product_id not in products_db:
         logger.warning(
             f"Product Service: Product with ID {product_id} not found for image upload."
         )
@@ -369,7 +300,6 @@ async def upload_product_image(
         )
 
         # Upload the file content directly
-        # Use stream=True for large files
         blob_client.upload_blob(
             file.file,
             overwrite=True,
@@ -377,7 +307,6 @@ async def upload_product_image(
         )
 
         # Generate Shared Access Signature (SAS) for public read access
-        # SAS will expire after AZURE_SAS_TOKEN_EXPIRY_HOURS
         sas_token = generate_blob_sas(
             account_name=AZURE_STORAGE_ACCOUNT_NAME,
             account_key=AZURE_STORAGE_ACCOUNT_KEY,
@@ -389,19 +318,15 @@ async def upload_product_image(
         # Construct the full URL with SAS token
         image_url = f"{blob_client.url}?{sas_token}"
 
-        # Update the product in the database with the image URL (including SAS token)
-        db_product.image_url = image_url
-        db.add(db_product)
-        db.commit()
-        db.refresh(db_product)
+        # Update the product in memory with the image URL (including SAS token)
+        products_db[product_id]["image_url"] = image_url
 
         logger.info(
             f"Product Service: Image uploaded and product {product_id} updated with SAS URL: {image_url}"
         )
-        return db_product
+        return ProductResponse(**products_db[product_id])
 
     except Exception as e:
-        db.rollback()
         logger.error(
             f"Product Service: Error uploading image for product {product_id}: {e}",
             exc_info=True,
@@ -411,7 +336,6 @@ async def upload_product_image(
             detail=f"Could not upload image or update product: {e}",
         )
 
-
 # --- Endpoint for Stock Deduction ---
 @app.patch(
     "/products/{product_id}/deduct-stock",
@@ -419,7 +343,7 @@ async def upload_product_image(
     summary="Deduct stock quantity for a product",
 )
 async def deduct_product_stock(
-    product_id: int, request: StockDeductRequest, db: Session = Depends(get_db)
+    product_id: int, request: StockDeductRequest
 ):
     """
     Deducts a specified quantity from a product's stock.
@@ -428,9 +352,8 @@ async def deduct_product_stock(
     logger.info(
         f"Product Service: Attempting to deduct {request.quantity_to_deduct} from stock for product ID: {product_id}"
     )
-    db_product = db.query(Product).filter(Product.product_id == product_id).first()
-
-    if not db_product:
+    
+    if product_id not in products_db:
         logger.warning(
             f"Product Service: Stock deduction failed: Product with ID {product_id} not found."
         )
@@ -438,40 +361,27 @@ async def deduct_product_stock(
             status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
         )
 
-    if db_product.stock_quantity < request.quantity_to_deduct:
+    product = products_db[product_id]
+    if product["stock_quantity"] < request.quantity_to_deduct:
         logger.warning(
-            f"Product Service: Stock deduction failed for product {product_id}. Insufficient stock: {db_product.stock_quantity} available, {request.quantity_to_deduct} requested."
+            f"Product Service: Stock deduction failed for product {product_id}. Insufficient stock: {product['stock_quantity']} available, {request.quantity_to_deduct} requested."
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Insufficient stock for product '{db_product.name}'. Only {db_product.stock_quantity} available.",
+            detail=f"Insufficient stock for product '{product['name']}'. Only {product['stock_quantity']} available.",
         )
 
     # Perform deduction
-    db_product.stock_quantity -= request.quantity_to_deduct
+    product["stock_quantity"] -= request.quantity_to_deduct
+    
+    logger.info(
+        f"Product Service: Stock for product {product_id} updated to {product['stock_quantity']}. Deducted {request.quantity_to_deduct}."
+    )
 
-    try:
-        db.add(db_product)
-        db.commit()
-        db.refresh(db_product)
-        logger.info(
-            f"Product Service: Stock for product {product_id} updated to {db_product.stock_quantity}. Deducted {request.quantity_to_deduct}."
+    # Optional: Log or trigger alert if stock falls below threshold
+    if product["stock_quantity"] < RESTOCK_THRESHOLD:
+        logger.warning(
+            f"Product Service: ALERT! Stock for product '{product['name']}' (ID: {product_id}) is low: {product['stock_quantity']}."
         )
 
-        # Optional: Log or trigger alert if stock falls below threshold
-        if db_product.stock_quantity < RESTOCK_THRESHOLD:
-            logger.warning(
-                f"Product Service: ALERT! Stock for product '{db_product.name}' (ID: {db_product.product_id}) is low: {db_product.stock_quantity}."
-            )
-
-        return db_product
-    except Exception as e:
-        db.rollback()
-        logger.error(
-            f"Product Service: Error deducting stock for product {product_id}: {e}",
-            exc_info=True,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not deduct stock.",
-        )
+    return ProductResponse(**product)

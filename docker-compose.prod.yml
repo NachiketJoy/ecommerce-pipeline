@@ -1,82 +1,21 @@
+# Simplified Production Environment - API Only
+
 version: "3.8"
 
 services:
-  # Production Database for Product Service
-  product_db_prod:
-    image: postgres:15-alpine
-    container_name: product_db_prod_container
-    restart: always
-    environment:
-      POSTGRES_DB: products
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - "5432:5432"
-    volumes:
-      - product_db_prod_data:/var/lib/postgresql/data
-      - ./backups:/backups
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d products"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - ecommerce_prod_network
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-        reservations:
-          memory: 512M
-
-  # Production Database for Order Service
-  order_db_prod:
-    image: postgres:15-alpine
-    container_name: order_db_prod_container
-    restart: always
-    environment:
-      POSTGRES_DB: orders
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - "5433:5432"
-    volumes:
-      - order_db_prod_data:/var/lib/postgresql/data
-      - ./backups:/backups
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d orders"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - ecommerce_prod_network
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-        reservations:
-          memory: 512M
-
   # Product Service for Production
   product-service-prod:
-    image: ecommerce/product-service:latest
+    image: simplified/product-service:latest
     container_name: product_service_prod_container
     restart: always
     ports:
       - "8000:8000"
     environment:
-      POSTGRES_HOST: product_db_prod
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: products
       AZURE_STORAGE_ACCOUNT_NAME: ${AZURE_STORAGE_ACCOUNT_NAME}
       AZURE_STORAGE_ACCOUNT_KEY: ${AZURE_STORAGE_ACCOUNT_KEY}
       AZURE_STORAGE_CONTAINER_NAME: ${AZURE_STORAGE_CONTAINER_NAME}
       AZURE_SAS_TOKEN_EXPIRY_HOURS: 24
       LOG_LEVEL: INFO
-    depends_on:
-      product_db_prod:
-        condition: service_healthy
     networks:
       - ecommerce_prod_network
     healthcheck:
@@ -99,21 +38,15 @@ services:
 
   # Order Service for Production
   order-service-prod:
-    image: ecommerce/order-service:latest
+    image: simplified/order-service:latest
     container_name: order_service_prod_container
     restart: always
     ports:
       - "8001:8000"
     environment:
-      POSTGRES_HOST: order_db_prod
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: orders
       PRODUCT_SERVICE_URL: http://product-service-prod:8000
       LOG_LEVEL: INFO
     depends_on:
-      order_db_prod:
-        condition: service_healthy
       product-service-prod:
         condition: service_healthy
     networks:
@@ -138,7 +71,7 @@ services:
 
   # Frontend for Production
   frontend-prod:
-    image: ecommerce/frontend:latest
+    image: simplified/frontend:latest
     container_name: frontend_prod_container
     restart: always
     ports:
@@ -189,10 +122,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
-volumes:
-  product_db_prod_data:
-  order_db_prod_data:
 
 networks:
   ecommerce_prod_network:
