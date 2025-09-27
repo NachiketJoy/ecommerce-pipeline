@@ -63,6 +63,16 @@ def mock_azure_blob_storage():
             mock_generate_blob_sas.return_value = "sv=2021-08-01&st=2024-01-01T00%3A00%3A00Z&se=2024-01-01T01%3A00%3A00Z&sr=b&sp=r&sig=mock_sas_token"
             yield mock_blob_service_client
 
+@pytest.fixture(scope="function", autouse=True)
+def clear_products_db():
+    """
+    Clears the products database before each test to ensure test isolation.
+    """
+    from app.main import products_db
+    products_db.clear()
+    yield
+    products_db.clear()
+
 # --- Product Service Tests ---
 
 def test_read_root(client: TestClient):

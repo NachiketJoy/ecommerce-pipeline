@@ -158,7 +158,7 @@ pipeline {
                             
                             // Run integration tests for Product Service
                             bat '''
-                                docker run --rm --network simplified_ecommerce_test_network ^
+                                docker run --rm --network ecommerce_test_network ^
                                     -v "%WORKSPACE%\\test-reports:/app/test-reports" ^
                                     -e PRODUCT_SERVICE_URL=http://product-service-test:8000 ^
                                     -e ORDER_SERVICE_URL=http://order-service-test:8000 ^
@@ -168,7 +168,7 @@ pipeline {
                             
                             // Run integration tests for Order Service
                             bat '''
-                                docker run --rm --network simplified_ecommerce_test_network ^
+                                docker run --rm --network ecommerce_test_network ^
                                     -v "%WORKSPACE%\\test-reports:/app/test-reports" ^
                                     -e PRODUCT_SERVICE_URL=http://product-service-test:8000 ^
                                     -e ORDER_SERVICE_URL=http://order-service-test:8000 ^
