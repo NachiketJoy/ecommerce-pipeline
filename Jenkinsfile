@@ -60,7 +60,7 @@ pipeline {
                         echo 'Building Product Service Docker image...'
                         script {
                             def productImage = docker.build(
-                                "${PRODUCT_SERVICE_IMAGE}:${BUILD_TAG}",
+                                "product-service",
                                 "-f backend/product_service/Dockerfile backend/product_service"
                             )
                             env.PRODUCT_SERVICE_IMAGE_ID = productImage.id
@@ -73,7 +73,7 @@ pipeline {
                         echo 'Building Order Service Docker image...'
                         script {
                             def orderImage = docker.build(
-                                "${ORDER_SERVICE_IMAGE}:${BUILD_TAG}",
+                                "order-service",
                                 "-f backend/order_service/Dockerfile backend/order_service"
                             )
                             env.ORDER_SERVICE_IMAGE_ID = orderImage.id
@@ -86,7 +86,7 @@ pipeline {
                         echo 'Building Frontend Docker image...'
                         script {
                             def frontendImage = docker.build(
-                                "${FRONTEND_IMAGE}:${BUILD_TAG}",
+                                "frontend",
                                 "-f frontend/Dockerfile frontend"
                             )
                             env.FRONTEND_IMAGE_ID = frontendImage.id
@@ -316,9 +316,12 @@ pipeline {
                 script {
                     // Tag images for test environment
                     bat '''
-                        docker tag %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG% %DOCKER_NAMESPACE%/%PRODUCT_SERVICE_IMAGE%:test
-                        docker tag %ORDER_SERVICE_IMAGE%:%BUILD_TAG% %DOCKER_NAMESPACE%/%ORDER_SERVICE_IMAGE%:test
-                        docker tag %FRONTEND_IMAGE%:%BUILD_TAG% %DOCKER_NAMESPACE%/%FRONTEND_IMAGE%:test
+                        docker tag product-service %DOCKER_NAMESPACE%/product-service:%BUILD_TAG%
+                        docker tag order-service %DOCKER_NAMESPACE%/order-service:%BUILD_TAG%
+                        docker tag frontend %DOCKER_NAMESPACE%/frontend:%BUILD_TAG%
+                        docker tag product-service %DOCKER_NAMESPACE%/product-service:test
+                        docker tag order-service %DOCKER_NAMESPACE%/order-service:test
+                        docker tag frontend %DOCKER_NAMESPACE%/frontend:test
                     '''
                     
                     // Deploy to test environment
@@ -371,12 +374,12 @@ pipeline {
                 script {
                     // Tag images for production
                     bat '''
-                        docker tag %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG% %DOCKER_NAMESPACE%/%PRODUCT_SERVICE_IMAGE%:latest
-                        docker tag %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG% %DOCKER_NAMESPACE%/%PRODUCT_SERVICE_IMAGE%:%BUILD_TAG%
-                        docker tag %ORDER_SERVICE_IMAGE%:%BUILD_TAG% %DOCKER_NAMESPACE%/%ORDER_SERVICE_IMAGE%:latest
-                        docker tag %ORDER_SERVICE_IMAGE%:%BUILD_TAG% %DOCKER_NAMESPACE%/%ORDER_SERVICE_IMAGE%:%BUILD_TAG%
-                        docker tag %FRONTEND_IMAGE%:%BUILD_TAG% %DOCKER_NAMESPACE%/%FRONTEND_IMAGE%:latest
-                        docker tag %FRONTEND_IMAGE%:%BUILD_TAG% %DOCKER_NAMESPACE%/%FRONTEND_IMAGE%:%BUILD_TAG%
+                        docker tag product-service %DOCKER_NAMESPACE%/product-service:latest
+                        docker tag product-service %DOCKER_NAMESPACE%/product-service:%BUILD_TAG%
+                        docker tag order-service %DOCKER_NAMESPACE%/order-service:latest
+                        docker tag order-service %DOCKER_NAMESPACE%/order-service:%BUILD_TAG%
+                        docker tag frontend %DOCKER_NAMESPACE%/frontend:latest
+                        docker tag frontend %DOCKER_NAMESPACE%/frontend:%BUILD_TAG%
                     '''
                     
                     // Push to registry
@@ -510,7 +513,7 @@ pipeline {
             emailext (
                 subject: "Pipeline Failed - Build ${BUILD_NUMBER}",
                 body: "The Jenkins pipeline has failed. Please check the logs for details.\n\nBuild: ${BUILD_NUMBER}\nCommit: ${GIT_COMMIT_SHORT}\nPipeline URL: ${BUILD_URL}",
-                to: "dev-team@company.com"
+                to: "njoyekurun@gmail.com"
             )
         }
         unstable {
