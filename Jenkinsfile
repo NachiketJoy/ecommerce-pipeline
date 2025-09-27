@@ -111,19 +111,17 @@ pipeline {
                     steps {
                         echo 'Running Product Service unit tests...'
                         script {
-                            docker.image("${PRODUCT_SERVICE_IMAGE}:${BUILD_TAG}").inside('-v /var/run/docker.sock:/var/run/docker.sock') {
-                                bat '''
-                                    cd /app
-                                    python -m pytest tests/ -v --tb=short --junitxml=test-results-product.xml --cov=app --cov-report=xml --cov-report=html
-                                '''
-                            }
+                            bat '''
+                                cd backend/product_service
+                                docker run --rm -v "%WORKSPACE%\\backend\\product_service:/app" -w /app product-service python -m pytest tests/ -v --tb=short --junitxml=test-results-product.xml --cov=app --cov-report=xml --cov-report=html
+                            '''
                         }
                     }
                     post {
                         always {
-                                junit '**/test-results-product.xml'
+                            junit 'backend/product_service/test-results-product.xml'
                             publishCoverage adapters: [
-                                coberturaAdapter('**/coverage.xml')
+                                coberturaAdapter('backend/product_service/coverage.xml')
                             ], sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
                         }
                     }
@@ -133,19 +131,17 @@ pipeline {
                     steps {
                         echo 'Running Order Service unit tests...'
                         script {
-                            docker.image("${ORDER_SERVICE_IMAGE}:${BUILD_TAG}").inside('-v /var/run/docker.sock:/var/run/docker.sock') {
-                                bat '''
-                                    cd /app
-                                    python -m pytest tests/ -v --tb=short --junitxml=test-results-order.xml --cov=app --cov-report=xml --cov-report=html
-                                '''
-                            }
+                            bat '''
+                                cd backend/order_service
+                                docker run --rm -v "%WORKSPACE%\\backend\\order_service:/app" -w /app order-service python -m pytest tests/ -v --tb=short --junitxml=test-results-order.xml --cov=app --cov-report=xml --cov-report=html
+                            '''
                         }
                     }
                     post {
                         always {
-                                junit '**/test-results-order.xml'
+                            junit 'backend/order_service/test-results-order.xml'
                             publishCoverage adapters: [
-                                coberturaAdapter('**/coverage.xml')
+                                coberturaAdapter('backend/order_service/coverage.xml')
                             ], sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
                         }
                     }
@@ -155,7 +151,10 @@ pipeline {
                     steps {
                         echo 'Running integration tests...'
                         script {
-                            // Start test environment
+                            // Create test reports directory
+                            bat 'mkdir test-reports 2>nul'
+                            
+                            // Start test environment with local images
                             bat '''
                                 docker-compose -f docker-compose.test.yml up -d
                                 timeout /t 30 /nobreak >nul 2>&1
@@ -164,17 +163,17 @@ pipeline {
                             // Run integration tests
                             bat '''
                                 docker run --rm --network ecommerce_test_network ^
-                                    -v %WORKSPACE%\test-reports:/app/test-reports ^
+                                    -v "%WORKSPACE%\\test-reports:/app/test-reports" ^
                                     -e PRODUCT_SERVICE_URL=http://product-service-test:8000 ^
                                     -e ORDER_SERVICE_URL=http://order-service-test:8000 ^
-                                    %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG% ^
+                                    product-service ^
                                     python -m pytest tests/integration/ -v --junitxml=/app/test-reports/integration-test-results.xml
                             '''
                         }
                     }
                     post {
                         always {
-                                junit 'test-reports/integration-test-results.xml'
+                            junit 'test-reports/integration-test-results.xml'
                             bat 'docker-compose -f docker-compose.test.yml down -v'
                         }
                     }
@@ -188,18 +187,16 @@ pipeline {
                     steps {
                         echo 'Running SonarQube analysis for Product Service...'
                         script {
-                            docker.image("${PRODUCT_SERVICE_IMAGE}:${BUILD_TAG}").inside() {
-                                bat '''
-                                    cd /app
-                                    sonar-scanner ^
-                                        -Dsonar.projectKey=ecommerce-product-service ^
-                                        -Dsonar.sources=. ^
-                                        -Dsonar.host.url=%SONAR_HOST_URL% ^
-                                        -Dsonar.login=%SONAR_TOKEN% ^
-                                        -Dsonar.python.coverage.reportPaths=coverage.xml ^
-                                        -Dsonar.python.xunit.reportPath=test-results-product.xml
-                                '''
-                            }
+                            bat '''
+                                cd backend/product_service
+                                docker run --rm -v "%WORKSPACE%\\backend\\product_service:/app" -w /app product-service sonar-scanner ^
+                                    -Dsonar.projectKey=ecommerce-product-service ^
+                                    -Dsonar.sources=. ^
+                                    -Dsonar.host.url=%SONAR_HOST_URL% ^
+                                    -Dsonar.login=%SONAR_TOKEN% ^
+                                    -Dsonar.python.coverage.reportPaths=coverage.xml ^
+                                    -Dsonar.python.xunit.reportPath=test-results-product.xml
+                            '''
                         }
                     }
                 }
@@ -208,18 +205,16 @@ pipeline {
                     steps {
                         echo 'Running SonarQube analysis for Order Service...'
                         script {
-                            docker.image("${ORDER_SERVICE_IMAGE}:${BUILD_TAG}").inside() {
-                                bat '''
-                                    cd /app
-                                    sonar-scanner ^
-                                        -Dsonar.projectKey=ecommerce-order-service ^
-                                        -Dsonar.sources=. ^
-                                        -Dsonar.host.url=%SONAR_HOST_URL% ^
-                                        -Dsonar.login=%SONAR_TOKEN% ^
-                                        -Dsonar.python.coverage.reportPaths=coverage.xml ^
-                                        -Dsonar.python.xunit.reportPath=test-results-order.xml
-                                '''
-                            }
+                            bat '''
+                                cd backend/order_service
+                                docker run --rm -v "%WORKSPACE%\\backend\\order_service:/app" -w /app order-service sonar-scanner ^
+                                    -Dsonar.projectKey=ecommerce-order-service ^
+                                    -Dsonar.sources=. ^
+                                    -Dsonar.host.url=%SONAR_HOST_URL% ^
+                                    -Dsonar.login=%SONAR_TOKEN% ^
+                                    -Dsonar.python.coverage.reportPaths=coverage.xml ^
+                                    -Dsonar.python.xunit.reportPath=test-results-order.xml
+                            '''
                         }
                     }
                 }
@@ -253,12 +248,12 @@ pipeline {
                                 )
                                 
                                 REM Scan all images
-                                trivy image --format json --output trivy-report.json %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG%
-                                trivy image --format json --output trivy-report-order.json %ORDER_SERVICE_IMAGE%:%BUILD_TAG%
-                                trivy image --format json --output trivy-report-frontend.json %FRONTEND_IMAGE%:%BUILD_TAG%
+                                trivy image --format json --output trivy-report.json product-service
+                                trivy image --format json --output trivy-report-order.json order-service
+                                trivy image --format json --output trivy-report-frontend.json frontend
                                 
                                 REM Generate HTML reports
-                                trivy image --format template --template "@contrib/html.tpl" --output trivy-report.html %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG%
+                                trivy image --format template --template "@contrib/html.tpl" --output trivy-report.html product-service
                             '''
                         }
                     }
@@ -281,17 +276,10 @@ pipeline {
                     steps {
                         echo 'Running Bandit security scan on Python code...'
                         script {
-                            docker.image("${PRODUCT_SERVICE_IMAGE}:${BUILD_TAG}").inside() {
-                                bat '''
-                                    cd /app
-                                    REM Install bandit
-                                    pip install bandit
-                                    
-                                    REM Run bandit scan
-                                    bandit -r . -f json -o bandit-report.json
-                                    bandit -r . -f html -o bandit-report.html
-                                '''
-                            }
+                            bat '''
+                                cd backend/product_service
+                                docker run --rm -v "%WORKSPACE%\\backend\\product_service:/app" -w /app product-service bash -c "pip install bandit && bandit -r . -f json -o bandit-report.json && bandit -r . -f html -o bandit-report.html"
+                            '''
                         }
                     }
                     post {
@@ -328,9 +316,9 @@ pipeline {
                     // Deploy to test environment
                     bat '''
                         REM Update docker-compose.test.yml with new image tags
-                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: njoy10/product-service:test', 'image: %DOCKER_NAMESPACE%/%PRODUCT_SERVICE_IMAGE%:test' | Set-Content docker-compose.test.yml"
-                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: njoy10/order-service:test', 'image: %DOCKER_NAMESPACE%/%ORDER_SERVICE_IMAGE%:test' | Set-Content docker-compose.test.yml"
-                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: njoy10/frontend:test', 'image: %DOCKER_NAMESPACE%/%FRONTEND_IMAGE%:test' | Set-Content docker-compose.test.yml"
+                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: product-service', 'image: %DOCKER_NAMESPACE%/product-service:test' | Set-Content docker-compose.test.yml"
+                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: order-service', 'image: %DOCKER_NAMESPACE%/order-service:test' | Set-Content docker-compose.test.yml"
+                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: frontend', 'image: %DOCKER_NAMESPACE%/frontend:test' | Set-Content docker-compose.test.yml"
                         
                         REM Deploy to test environment
                         docker-compose -f docker-compose.test.yml up -d
@@ -385,20 +373,20 @@ pipeline {
                     
                     // Push to registry
                     bat '''
-                        docker push %DOCKER_NAMESPACE%/%PRODUCT_SERVICE_IMAGE%:latest
-                        docker push %DOCKER_NAMESPACE%/%PRODUCT_SERVICE_IMAGE%:%BUILD_TAG%
-                        docker push %DOCKER_NAMESPACE%/%ORDER_SERVICE_IMAGE%:latest
-                        docker push %DOCKER_NAMESPACE%/%ORDER_SERVICE_IMAGE%:%BUILD_TAG%
-                        docker push %DOCKER_NAMESPACE%/%FRONTEND_IMAGE%:latest
-                        docker push %DOCKER_NAMESPACE%/%FRONTEND_IMAGE%:%BUILD_TAG%
+                        docker push %DOCKER_NAMESPACE%/product-service:latest
+                        docker push %DOCKER_NAMESPACE%/product-service:%BUILD_TAG%
+                        docker push %DOCKER_NAMESPACE%/order-service:latest
+                        docker push %DOCKER_NAMESPACE%/order-service:%BUILD_TAG%
+                        docker push %DOCKER_NAMESPACE%/frontend:latest
+                        docker push %DOCKER_NAMESPACE%/frontend:%BUILD_TAG%
                     '''
                     
                     // Deploy to production
                     bat '''
                         REM Update production docker-compose
-                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: .*product-service.*', 'image: %DOCKER_NAMESPACE%/%PRODUCT_SERVICE_IMAGE%:latest' | Set-Content docker-compose.prod.yml"
-                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: .*order-service.*', 'image: %DOCKER_NAMESPACE%/%ORDER_SERVICE_IMAGE%:latest' | Set-Content docker-compose.prod.yml"
-                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: .*frontend.*', 'image: %DOCKER_NAMESPACE%/%FRONTEND_IMAGE%:latest' | Set-Content docker-compose.prod.yml"
+                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: .*product-service.*', 'image: %DOCKER_NAMESPACE%/product-service:latest' | Set-Content docker-compose.prod.yml"
+                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: .*order-service.*', 'image: %DOCKER_NAMESPACE%/order-service:latest' | Set-Content docker-compose.prod.yml"
+                        powershell -Command "(Get-Content docker-compose.prod.yml) -replace 'image: .*frontend.*', 'image: %DOCKER_NAMESPACE%/frontend:latest' | Set-Content docker-compose.prod.yml"
                         
                         REM Deploy to production
                         docker-compose -f docker-compose.prod.yml up -d
