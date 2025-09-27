@@ -436,39 +436,39 @@ pipeline {
                     // Configure Prometheus monitoring
                     bat '''
                         REM Update Prometheus configuration
-                        echo global: > prometheus\prometheus.yml
-                        echo   scrape_interval: 15s >> prometheus\prometheus.yml
-                        echo   evaluation_interval: 15s >> prometheus\prometheus.yml
-                        echo. >> prometheus\prometheus.yml
-                        echo rule_files: >> prometheus\prometheus.yml
-                        echo   - "alert_rules.yml" >> prometheus\prometheus.yml
-                        echo. >> prometheus\prometheus.yml
-                        echo alerting: >> prometheus\prometheus.yml
-                        echo   alertmanagers: >> prometheus\prometheus.yml
-                        echo     - static_configs: >> prometheus\prometheus.yml
-                        echo         - targets: >> prometheus\prometheus.yml
-                        echo           - alertmanager:9093 >> prometheus\prometheus.yml
-                        echo. >> prometheus\prometheus.yml
-                        echo scrape_configs: >> prometheus\prometheus.yml
-                        echo   - job_name: 'product-service' >> prometheus\prometheus.yml
-                        echo     static_configs: >> prometheus\prometheus.yml
-                        echo       - targets: ['product-service:8000'] >> prometheus\prometheus.yml
-                        echo     metrics_path: '/metrics' >> prometheus\prometheus.yml
-                        echo     scrape_interval: 5s >> prometheus\prometheus.yml
-                        echo. >> prometheus\prometheus.yml
-                        echo   - job_name: 'order-service' >> prometheus\prometheus.yml
-                        echo     static_configs: >> prometheus\prometheus.yml
-                        echo       - targets: ['order-service:8000'] >> prometheus\prometheus.yml
-                        echo     metrics_path: '/metrics' >> prometheus\prometheus.yml
-                        echo     scrape_interval: 5s >> prometheus\prometheus.yml
-                        echo. >> prometheus\prometheus.yml
-                        echo   - job_name: 'postgres' >> prometheus\prometheus.yml
-                        echo     static_configs: >> prometheus\prometheus.yml
-                        echo       - targets: ['postgres-exporter:9187'] >> prometheus\prometheus.yml
-                        echo. >> prometheus\prometheus.yml
-                        echo   - job_name: 'node-exporter' >> prometheus\prometheus.yml
-                        echo     static_configs: >> prometheus\prometheus.yml
-                        echo       - targets: ['node-exporter:9100'] >> prometheus\prometheus.yml
+                        echo global: > prometheus\\prometheus.yml
+                        echo   scrape_interval: 15s >> prometheus\\prometheus.yml
+                        echo   evaluation_interval: 15s >> prometheus\\prometheus.yml
+                        echo. >> prometheus\\prometheus.yml
+                        echo rule_files: >> prometheus\\prometheus.yml
+                        echo   - "alert_rules.yml" >> prometheus\\prometheus.yml
+                        echo. >> prometheus\\prometheus.yml
+                        echo alerting: >> prometheus\\prometheus.yml
+                        echo   alertmanagers: >> prometheus\\prometheus.yml
+                        echo     - static_configs: >> prometheus\\prometheus.yml
+                        echo         - targets: >> prometheus\\prometheus.yml
+                        echo           - alertmanager:9093 >> prometheus\\prometheus.yml
+                        echo. >> prometheus\\prometheus.yml
+                        echo scrape_configs: >> prometheus\\prometheus.yml
+                        echo   - job_name: 'product-service' >> prometheus\\prometheus.yml
+                        echo     static_configs: >> prometheus\\prometheus.yml
+                        echo       - targets: ['product-service:8000'] >> prometheus\\prometheus.yml
+                        echo     metrics_path: '/metrics' >> prometheus\\prometheus.yml
+                        echo     scrape_interval: 5s >> prometheus\\prometheus.yml
+                        echo. >> prometheus\\prometheus.yml
+                        echo   - job_name: 'order-service' >> prometheus\\prometheus.yml
+                        echo     static_configs: >> prometheus\\prometheus.yml
+                        echo       - targets: ['order-service:8000'] >> prometheus\\prometheus.yml
+                        echo     metrics_path: '/metrics' >> prometheus\\prometheus.yml
+                        echo     scrape_interval: 5s >> prometheus\\prometheus.yml
+                        echo. >> prometheus\\prometheus.yml
+                        echo   - job_name: 'postgres' >> prometheus\\prometheus.yml
+                        echo     static_configs: >> prometheus\\prometheus.yml
+                        echo       - targets: ['postgres-exporter:9187'] >> prometheus\\prometheus.yml
+                        echo. >> prometheus\\prometheus.yml
+                        echo   - job_name: 'node-exporter' >> prometheus\\prometheus.yml
+                        echo     static_configs: >> prometheus\\prometheus.yml
+                        echo       - targets: ['node-exporter:9100'] >> prometheus\\prometheus.yml
                         
                         REM Start monitoring stack
                         docker-compose -f docker-compose.monitoring.yml up -d
