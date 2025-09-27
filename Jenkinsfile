@@ -111,18 +111,16 @@ pipeline {
                     steps {
                         echo 'Running Product Service unit tests...'
                         script {
-                            bat '''
-                                cd backend/product_service
-                                docker run --rm -v "%WORKSPACE%\\backend\\product_service:/app" -w /app product-service python -m pytest tests/ -v --tb=short --junitxml=test-results-product.xml --cov=app --cov-report=xml --cov-report=html
-                            '''
+                                bat '''
+                                    cd backend/product_service
+                                    docker run --rm -v "%WORKSPACE%\\backend\\product_service:/app" -w /app -e POSTGRES_HOST=product_db_test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=products_test product-service python -m pytest tests/ -v --tb=short --junitxml=test-results-product.xml --cov=app --cov-report=xml --cov-report=html
+                                '''
                         }
                     }
                     post {
                         always {
                             junit 'backend/product_service/test-results-product.xml'
-                            publishCoverage adapters: [
-                                coberturaAdapter('backend/product_service/coverage.xml')
-                            ], sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
+                                // Removed coberturaAdapter: not supported in Jenkins
                         }
                     }
                 }
@@ -131,18 +129,16 @@ pipeline {
                     steps {
                         echo 'Running Order Service unit tests...'
                         script {
-                            bat '''
-                                cd backend/order_service
-                                docker run --rm -v "%WORKSPACE%\\backend\\order_service:/app" -w /app order-service python -m pytest tests/ -v --tb=short --junitxml=test-results-order.xml --cov=app --cov-report=xml --cov-report=html
-                            '''
+                                bat '''
+                                    cd backend/order_service
+                                    docker run --rm -v "%WORKSPACE%\\backend\\order_service:/app" -w /app -e POSTGRES_HOST=order_db_test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=orders_test order-service python -m pytest tests/ -v --tb=short --junitxml=test-results-order.xml --cov=app --cov-report=xml --cov-report=html
+                                '''
                         }
                     }
                     post {
                         always {
                             junit 'backend/order_service/test-results-order.xml'
-                            publishCoverage adapters: [
-                                coberturaAdapter('backend/order_service/coverage.xml')
-                            ], sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
+                                // Removed coberturaAdapter: not supported in Jenkins
                         }
                     }
                 }
