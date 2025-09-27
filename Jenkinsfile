@@ -63,7 +63,7 @@ pipeline {
                         script {
                             bat '''
                                 cd backend\\product_service
-                                docker run --rm -v "%cd%:/app" -w /app product-service python -m pytest tests/test_main.py -v --junitxml=test-results-product.xml
+                                docker run --rm -v "%cd%:/app" -w /app product-service npm test -- --testResultsProcessor=junit --outputFile=test-results-product.xml
                             '''
                         }
                     }
@@ -80,7 +80,7 @@ pipeline {
                         script {
                             bat '''
                                 cd backend\\order_service
-                                docker run --rm -v "%cd%:/app" -w /app order-service python -m pytest tests/test_main.py -v --junitxml=test-results-order.xml
+                                docker run --rm -v "%cd%:/app" -w /app order-service npm test -- --testResultsProcessor=junit --outputFile=test-results-order.xml
                             '''
                         }
                     }
@@ -140,7 +140,7 @@ pipeline {
                         script {
                             bat '''
                                 cd backend\\product_service
-                                docker run --rm -v "%cd%:/app" -w /app -e SONAR_TOKEN=%SONAR_TOKEN% product-service python -m pytest --cov=app --cov-report=xml --cov-report=html
+                                docker run --rm -v "%cd%:/app" -w /app -e SONAR_TOKEN=%SONAR_TOKEN% product-service npm test
                             '''
                         }
                     }
@@ -152,7 +152,7 @@ pipeline {
                         script {
                             bat '''
                                 cd backend\\order_service
-                                docker run --rm -v "%cd%:/app" -w /app -e SONAR_TOKEN=%SONAR_TOKEN% order-service python -m pytest --cov=app --cov-report=xml --cov-report=html
+                                docker run --rm -v "%cd%:/app" -w /app -e SONAR_TOKEN=%SONAR_TOKEN% order-service npm test
                             '''
                         }
                     }
@@ -187,7 +187,7 @@ pipeline {
                                 findstr /s /i "password" backend\\*.* || echo No password found
                                 findstr /s /i "secret" backend\\*.* || echo No secret found
                                 findstr /s /i "key" backend\\*.* || echo No key found
-                                echo Python security scan completed
+                                echo Node.js security scan completed
                             '''
                         }
                     }
