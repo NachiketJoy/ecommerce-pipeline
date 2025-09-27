@@ -328,9 +328,9 @@ pipeline {
                     // Deploy to test environment
                     bat '''
                         REM Update docker-compose.test.yml with new image tags
-                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: .*product-service.*', 'image: %DOCKER_NAMESPACE%/%PRODUCT_SERVICE_IMAGE%:test' | Set-Content docker-compose.test.yml"
-                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: .*order-service.*', 'image: %DOCKER_NAMESPACE%/%ORDER_SERVICE_IMAGE%:test' | Set-Content docker-compose.test.yml"
-                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: .*frontend.*', 'image: %DOCKER_NAMESPACE%/%FRONTEND_IMAGE%:test' | Set-Content docker-compose.test.yml"
+                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: njoy10/product-service:test', 'image: %DOCKER_NAMESPACE%/%PRODUCT_SERVICE_IMAGE%:test' | Set-Content docker-compose.test.yml"
+                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: njoy10/order-service:test', 'image: %DOCKER_NAMESPACE%/%ORDER_SERVICE_IMAGE%:test' | Set-Content docker-compose.test.yml"
+                        powershell -Command "(Get-Content docker-compose.test.yml) -replace 'image: njoy10/frontend:test', 'image: %DOCKER_NAMESPACE%/%FRONTEND_IMAGE%:test' | Set-Content docker-compose.test.yml"
                         
                         REM Deploy to test environment
                         docker-compose -f docker-compose.test.yml up -d
