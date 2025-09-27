@@ -106,10 +106,10 @@ pipeline {
                                 mkdir test-reports 2>nul
                                 
                                 # Test product service
-                                curl -f http://localhost:8000/health >nul 2>&1 && echo Product service is healthy || echo Product service is not responding
+                                powershell -Command "try { Invoke-WebRequest -Uri 'http://localhost:8000/health' -UseBasicParsing | Out-Null; echo 'Product service is healthy' } catch { echo 'Product service is not responding' }"
                                 
                                 # Test order service
-                                curl -f http://localhost:8001/health >nul 2>&1 && echo Order service is healthy || echo Order service is not responding
+                                powershell -Command "try { Invoke-WebRequest -Uri 'http://localhost:8001/health' -UseBasicParsing | Out-Null; echo 'Order service is healthy' } catch { echo 'Order service is not responding' }"
                                 
                                 # Create a simple test report
                                 echo ^<?xml version="1.0" encoding="UTF-8"?^> > test-reports\\integration-test-results.xml
@@ -207,9 +207,9 @@ pipeline {
                         timeout /t 30 /nobreak >nul 2>&1
                         
                         # Verify deployment
-                        curl -f http://localhost:8000/health || exit /b 1
-                        curl -f http://localhost:8001/health || exit /b 1
-                        curl -f http://localhost:3000 || exit /b 1
+                        powershell -Command "try { Invoke-WebRequest -Uri 'http://localhost:8000/health' -UseBasicParsing | Out-Null } catch { exit 1 }"
+                        powershell -Command "try { Invoke-WebRequest -Uri 'http://localhost:8001/health' -UseBasicParsing | Out-Null } catch { exit 1 }"
+                        powershell -Command "try { Invoke-WebRequest -Uri 'http://localhost:3000' -UseBasicParsing | Out-Null } catch { exit 1 }"
                         
                         echo Test deployment successful!
                     '''
@@ -243,9 +243,9 @@ pipeline {
                         timeout /t 30 /nobreak >nul 2>&1
                         
                         # Verify production deployment
-                        curl -f http://localhost:8000/health || exit /b 1
-                        curl -f http://localhost:8001/health || exit /b 1
-                        curl -f http://localhost:3000 || exit /b 1
+                        powershell -Command "try { Invoke-WebRequest -Uri 'http://localhost:8000/health' -UseBasicParsing | Out-Null } catch { exit 1 }"
+                        powershell -Command "try { Invoke-WebRequest -Uri 'http://localhost:8001/health' -UseBasicParsing | Out-Null } catch { exit 1 }"
+                        powershell -Command "try { Invoke-WebRequest -Uri 'http://localhost:3000' -UseBasicParsing | Out-Null } catch { exit 1 }"
                         
                         echo Production release successful!
                     '''
@@ -270,9 +270,9 @@ pipeline {
                         echo Setting up basic monitoring...
                         
                         # Check service health
-                        curl -f http://localhost:8000/health >nul 2>&1 && echo Product service: OK || echo Product service: FAIL
-                        curl -f http://localhost:8001/health >nul 2>&1 && echo Order service: OK || echo Order service: FAIL
-                        curl -f http://localhost:3000 >nul 2>&1 && echo Frontend: OK || echo Frontend: FAIL
+                        powershell -Command "try { Invoke-WebRequest -Uri 'http://localhost:8000/health' -UseBasicParsing | Out-Null; echo 'Product service: OK' } catch { echo 'Product service: FAIL' }"
+                        powershell -Command "try { Invoke-WebRequest -Uri 'http://localhost:8001/health' -UseBasicParsing | Out-Null; echo 'Order service: OK' } catch { echo 'Order service: FAIL' }"
+                        powershell -Command "try { Invoke-WebRequest -Uri 'http://localhost:3000' -UseBasicParsing | Out-Null; echo 'Frontend: OK' } catch { echo 'Frontend: FAIL' }"
                         
                         echo Monitoring setup completed
                     '''

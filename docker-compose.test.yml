@@ -7,11 +7,6 @@ services:
       - "8000:8000"
     environment:
       - PYTHONPATH=/app
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
 
   order-service-test:
     build: ./backend/order_service
@@ -21,13 +16,7 @@ services:
       - PYTHONPATH=/app
       - PRODUCT_SERVICE_URL=http://product-service-test:8000
     depends_on:
-      product-service-test:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      - product-service-test
 
   frontend-test:
     build: ./frontend
