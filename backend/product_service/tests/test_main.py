@@ -25,39 +25,45 @@ logging.getLogger("app.main").setLevel(logging.WARNING)  # Suppress app's own in
 # --- Pytest Fixtures ---
 @pytest.fixture(scope="session", autouse=True)
 def setup_database_for_tests():
-    max_retries = 10
-    retry_delay_seconds = 3
-    for i in range(max_retries):
-        try:
-            logging.info(
-                f"Product Service Tests: Attempting to connect to PostgreSQL for test setup (attempt {i+1}/{max_retries})..."
-            )
-            # Explicitly drop all tables first to ensure a clean slate for the session
-            Base.metadata.drop_all(bind=engine)
-            logging.info(
-                "Product Service Tests: Successfully dropped all tables in PostgreSQL for test setup."
-            )
-
-            # Then create all tables required by the application
-            Base.metadata.create_all(bind=engine)
-            logging.info(
-                "Product Service Tests: Successfully created all tables in PostgreSQL for test setup."
-            )
-            break
-        except OperationalError as e:
-            logging.warning(
-                f"Product Service Tests: Test setup DB connection failed: {e}. Retrying in {retry_delay_seconds} seconds..."
-            )
-            time.sleep(retry_delay_seconds)
-            if i == max_retries - 1:
-                pytest.fail(
-                    f"Could not connect to PostgreSQL for Product Service test setup after {max_retries} attempts: {e}"
+    """Skip database setup for unit tests that don't need real database."""
+    # For unit tests, we'll mock the database connection
+    # Only run database setup if we're in integration test mode
+    if os.getenv('INTEGRATION_TEST_MODE'):
+        max_retries = 10
+        retry_delay_seconds = 3
+        for i in range(max_retries):
+            try:
+                logging.info(
+                    f"Product Service Tests: Attempting to connect to PostgreSQL for test setup (attempt {i+1}/{max_retries})..."
                 )
-        except Exception as e:
-            pytest.fail(
-                f"Product Service Tests: An unexpected error occurred during test DB setup: {e}",
-                pytrace=True,
-            )
+                # Explicitly drop all tables first to ensure a clean slate for the session
+                Base.metadata.drop_all(bind=engine)
+                logging.info(
+                    "Product Service Tests: Successfully dropped all tables in PostgreSQL for test setup."
+                )
+
+                # Then create all tables required by the application
+                Base.metadata.create_all(bind=engine)
+                logging.info(
+                    "Product Service Tests: Successfully created all tables in PostgreSQL for test setup."
+                )
+                break
+            except OperationalError as e:
+                logging.warning(
+                    f"Product Service Tests: Test setup DB connection failed: {e}. Retrying in {retry_delay_seconds} seconds..."
+                )
+                time.sleep(retry_delay_seconds)
+                if i == max_retries - 1:
+                    pytest.fail(
+                        f"Could not connect to PostgreSQL for Product Service test setup after {max_retries} attempts: {e}"
+                    )
+            except Exception as e:
+                pytest.fail(
+                    f"Product Service Tests: An unexpected error occurred during test DB setup: {e}",
+                    pytrace=True,
+                )
+    else:
+        logging.info("Product Service Tests: Skipping database setup for unit tests")
 
     yield
 
