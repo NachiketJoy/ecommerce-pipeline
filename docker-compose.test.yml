@@ -56,6 +56,8 @@ services:
       AZURE_STORAGE_ACCOUNT_KEY: testkey
       AZURE_STORAGE_CONTAINER_NAME: test-images
       AZURE_SAS_TOKEN_EXPIRY_HOURS: 1
+    volumes:
+      - ./test-reports:/app/test-reports
     depends_on:
       product_db_test:
         condition: service_healthy
@@ -79,6 +81,8 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: orders_test
       PRODUCT_SERVICE_URL: http://product-service-test:8000
+    volumes:
+      - ./test-reports:/app/test-reports
     depends_on:
       order_db_test:
         condition: service_healthy

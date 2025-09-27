@@ -164,16 +164,17 @@ pipeline {
                             // Run integration tests
                             bat '''
                                 docker run --rm --network ecommerce_test_network ^
+                                    -v %WORKSPACE%\test-reports:/app/test-reports ^
                                     -e PRODUCT_SERVICE_URL=http://product-service-test:8000 ^
                                     -e ORDER_SERVICE_URL=http://order-service-test:8000 ^
                                     %PRODUCT_SERVICE_IMAGE%:%BUILD_TAG% ^
-                                    python -m pytest tests/integration/ -v --junitxml=integration-test-results.xml
+                                    python -m pytest tests/integration/ -v --junitxml=/app/test-reports/integration-test-results.xml
                             '''
                         }
                     }
                     post {
                         always {
-                                junit '**/integration-test-results.xml'
+                                junit 'test-reports/integration-test-results.xml'
                             bat 'docker-compose -f docker-compose.test.yml down -v'
                         }
                     }
