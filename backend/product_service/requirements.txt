@@ -4,3 +4,6 @@ python-multipart
 pydantic
 azure-storage-blob
 httpx
+pytest
+pytest-cov
+pytest-asyncio

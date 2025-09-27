@@ -2,3 +2,6 @@ fastapi
 uvicorn
 pydantic
 httpx
+pytest
+pytest-cov
+pytest-asyncio

@@ -109,7 +109,7 @@ pipeline {
                         script {
                             bat '''
                                 cd backend/product_service
-                                docker run --rm -v "%WORKSPACE%\\backend\\product_service:/app" -w /app product-service python -m pytest tests/test_main.py -v --tb=short --junitxml=test-results-product.xml --cov=app --cov-report=xml --cov-report=html
+                                docker run --rm -v "%WORKSPACE%\\backend\\product_service:/app" -w /app product-service python -m pytest tests/test_main.py -v --tb=short --junitxml=/app/test-results-product.xml --cov=app --cov-report=xml --cov-report=html
                             '''
                         }
                     }
@@ -126,7 +126,7 @@ pipeline {
                         script {
                             bat '''
                                 cd backend/order_service
-                                docker run --rm -v "%WORKSPACE%\\backend\\order_service:/app" -w /app order-service python -m pytest tests/test_main.py -v --tb=short --junitxml=test-results-order.xml --cov=app --cov-report=xml --cov-report=html
+                                docker run --rm -v "%WORKSPACE%\\backend\\order_service:/app" -w /app order-service python -m pytest tests/test_main.py -v --tb=short --junitxml=/app/test-results-order.xml --cov=app --cov-report=xml --cov-report=html
                             '''
                         }
                     }

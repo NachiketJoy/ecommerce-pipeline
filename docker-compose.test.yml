@@ -4,7 +4,7 @@
 services:
   # Product Service for Testing
   product-service-test:
-    image: simplified_product_service:latest
+    image: product-service:latest
     container_name: product_service_test_container
     ports:
       - "8000:8000"
@@ -25,7 +25,7 @@ services:
 
   # Order Service for Testing
   order-service-test:
-    image: simplified_order_service:latest
+    image: order-service:latest
     container_name: order_service_test_container
     ports:
       - "8001:8000"
@@ -46,7 +46,7 @@ services:
 
   # Frontend for Testing
   frontend-test:
-    image: simplified_frontend:latest
+    image: frontend:latest
     container_name: frontend_test_container
     ports:
       - "3000:80"
