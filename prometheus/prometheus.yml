@@ -1,4 +1,4 @@
-# week09/example-3/prometheus/prometheus.yml
+# Prometheus configuration for simplified e-commerce application
 
 global:
   scrape_interval: 15s
@@ -8,10 +8,8 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  - job_name: 'product-service'
+  - job_name: 'backend-service'
     static_configs:
-      - targets: ['product_service:8000']
-  
-  - job_name: 'order-service'
-    static_configs:
-      - targets: ['order_service:8000']
+      - targets: ['backend:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 15s

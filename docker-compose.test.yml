@@ -1,30 +1,26 @@
 version: '3.8'
 
 services:
-  product-service-test:
-    build: ./backend/product_service
+  backend-test:
+    build: ./backend
     ports:
       - "8000:8000"
     environment:
-      - PYTHONPATH=/app
-
-  order-service-test:
-    build: ./backend/order_service
-    ports:
-      - "8001:8000"
-    environment:
-      - PYTHONPATH=/app
-      - PRODUCT_SERVICE_URL=http://product-service-test:8000
-    depends_on:
-      - product-service-test
+      - NODE_ENV=test
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   frontend-test:
     build: ./frontend
     ports:
       - "3000:80"
     depends_on:
-      - product-service-test
-      - order-service-test
+      backend-test:
+        condition: service_healthy
 
 networks:
   default:

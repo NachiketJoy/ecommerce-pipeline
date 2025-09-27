@@ -1,19 +1,8 @@
 // week08/frontend/main.js
 
 document.addEventListener('DOMContentLoaded', () => {
-    // API endpoints for the Product and Order services.
-    // These ports (30000 for Product, 30001 for Order) are mapped
-    // from the Docker containers to the host machine in docker-compose.yml for Example 2.
-    // const PRODUCT_API_BASE_URL = 'http://4.254.38.183:8000';
-    // const ORDER_API_BASE_URL = 'http://4.237.152.2:8001';
-
-    const PRODUCT_API_BASE_URL = '_PRODUCT_API_URL_';
-    const ORDER_API_BASE_URL = '_ORDER_API_URL_';
-
-    // Product Service is named 'product-service-w04e2' and exposes port 8000 internally.
-    //const PRODUCT_API_BASE_URL = 'http://product-service-w04e2:8000';
-    // Order Service is named 'order-service-w04e2' and exposes port 8001 internally.
-    //const ORDER_API_BASE_URL = 'http://order-service-w04e2:8001';
+    // Single backend API endpoint
+    const API_BASE_URL = '_API_URL_';
 
     // DOM Elements
     const messageBox = document.getElementById('message-box');
@@ -51,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fetch and display products
     async function fetchProducts() {
         productListDiv.innerHTML = '<p>Loading products...</p>';
-        const url = `${PRODUCT_API_BASE_URL}/products/`;
+        const url = `${API_BASE_URL}/products/`;
         console.log("Attempting to fetch products from URL:", url); // DEBUG LOG
         try {
             const response = await fetch(url);
@@ -114,11 +103,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const newProduct = { name, price, stock_quantity, description };
 
-        console.log("Product API Base URL:", PRODUCT_API_BASE_URL);
-        console.log("Order API Base URL:", ORDER_API_BASE_URL);
+        console.log("API Base URL:", API_BASE_URL);
 
         try {
-            const response = await fetch(`${PRODUCT_API_BASE_URL}/products/`, {
+            const response = await fetch(`${API_BASE_URL}/products/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -150,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             try {
-                const response = await fetch(`${PRODUCT_API_BASE_URL}/products/${productId}`, {
+                const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
                     method: 'DELETE',
                 });
 
@@ -192,7 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 showMessage(`Uploading image for product ${productId}...`, 'info');
-                const response = await fetch(`${PRODUCT_API_BASE_URL}/products/${productId}/upload-image`, {
+                const response = await fetch(`${API_BASE_URL}/products/${productId}/upload-image`, {
                     method: 'POST',
                     body: formData, // No 'Content-Type' header needed for FormData; browser sets it
                 });
@@ -283,7 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             showMessage("Placing order...", 'info');
-            const response = await fetch(`${ORDER_API_BASE_URL}/orders/`, {
+            const response = await fetch(`${API_BASE_URL}/orders/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -314,7 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchOrders() {
         orderListDiv.innerHTML = '<p>Loading orders...</p>';
         try {
-            const response = await fetch(`${ORDER_API_BASE_URL}/orders/`);
+            const response = await fetch(`${API_BASE_URL}/orders/`);
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
@@ -384,7 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 showMessage(`Updating status for order ${orderId} to "${newStatus}"...`, 'info');
-                const response = await fetch(`${ORDER_API_BASE_URL}/orders/${orderId}/status?new_status=${newStatus}`, {
+                const response = await fetch(`${API_BASE_URL}/orders/${orderId}/status?new_status=${newStatus}`, {
                     method: 'PATCH',
                 });
 
@@ -410,7 +398,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             try {
-                const response = await fetch(`${ORDER_API_BASE_URL}/orders/${orderId}`, {
+                const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
                     method: 'DELETE',
                 });
 

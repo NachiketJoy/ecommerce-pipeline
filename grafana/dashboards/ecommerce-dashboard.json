@@ -1,8 +1,8 @@
 {
   "dashboard": {
     "id": null,
-    "title": "E-commerce Microservices Dashboard",
-    "tags": ["ecommerce", "microservices"],
+    "title": "E-commerce Application Dashboard",
+    "tags": ["ecommerce", "monolithic"],
     "style": "dark",
     "timezone": "browser",
     "panels": [
@@ -12,7 +12,7 @@
         "type": "stat",
         "targets": [
           {
-            "expr": "up{job=~\"product-service|order-service\"}",
+            "expr": "up{job=\"backend-service\"}",
             "legendFormat": "{{job}}"
           }
         ],

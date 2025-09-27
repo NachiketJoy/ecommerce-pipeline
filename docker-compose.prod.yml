@@ -1,58 +1,24 @@
-# Simplified Production Environment - API Only
+# Simplified Production Environment - Monolithic Architecture
 
 version: "3.8"
 
 services:
-  # Product Service for Production
-  product-service-prod:
-    image: simplified/product-service:latest
-    container_name: product_service_prod_container
+  # Backend Service for Production
+  backend-prod:
+    image: backend:latest
+    container_name: backend_prod_container
     restart: always
     ports:
       - "8000:8000"
     environment:
+      NODE_ENV: production
       AZURE_STORAGE_ACCOUNT_NAME: ${AZURE_STORAGE_ACCOUNT_NAME}
       AZURE_STORAGE_ACCOUNT_KEY: ${AZURE_STORAGE_ACCOUNT_KEY}
-      AZURE_STORAGE_CONTAINER_NAME: ${AZURE_STORAGE_CONTAINER_NAME}
-      AZURE_SAS_TOKEN_EXPIRY_HOURS: 24
       LOG_LEVEL: INFO
     networks:
       - ecommerce_prod_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 256M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  # Order Service for Production
-  order-service-prod:
-    image: simplified/order-service:latest
-    container_name: order_service_prod_container
-    restart: always
-    ports:
-      - "8001:8000"
-    environment:
-      PRODUCT_SERVICE_URL: http://product-service-prod:8000
-      LOG_LEVEL: INFO
-    depends_on:
-      product-service-prod:
-        condition: service_healthy
-    networks:
-      - ecommerce_prod_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -71,20 +37,18 @@ services:
 
   # Frontend for Production
   frontend-prod:
-    image: simplified/frontend:latest
+    image: frontend:latest
     container_name: frontend_prod_container
     restart: always
     ports:
       - "3000:80"
     depends_on:
-      product-service-prod:
-        condition: service_healthy
-      order-service-prod:
+      backend-prod:
         condition: service_healthy
     networks:
       - ecommerce_prod_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -99,29 +63,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
-  # Nginx Reverse Proxy for Production
-  nginx-prod:
-    image: nginx:alpine
-    container_name: nginx_prod_container
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - frontend-prod
-      - product-service-prod
-      - order-service-prod
-    networks:
-      - ecommerce_prod_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
 networks:
   ecommerce_prod_network:
