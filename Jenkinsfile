@@ -247,7 +247,7 @@ pipeline {
                                     echo Installing Trivy...
                                     powershell -Command "Invoke-WebRequest -Uri 'https://github.com/aquasecurity/trivy/releases/latest/download/trivy_windows_amd64.zip' -OutFile 'trivy.zip'"
                                     powershell -Command "Expand-Archive -Path 'trivy.zip' -DestinationPath '.' -Force"
-                                    move trivy.exe C:\Windows\System32\
+                                    move trivy.exe C:\\Windows\\System32\\
                                     del trivy.zip
                                 )
                                 
