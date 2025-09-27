@@ -54,7 +54,7 @@ pipeline {
                         script {
                             bat '''
                                 cd backend
-                                docker run --rm -v "%cd%:/app" -w /app -e NODE_ENV=test backend npm test
+                                docker run --rm -v "%cd%:/output" -e NODE_ENV=test backend sh -c "npm test && cp test-results-backend.xml /output/"
                             '''
                         }
                     }
