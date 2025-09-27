@@ -43,7 +43,7 @@ services:
 
   # Product Service for Testing
   product-service-test:
-    image: ecommerce/product-service:test
+    image: product-service
     container_name: product_service_test_container
     ports:
       - "8000:8000"
@@ -69,7 +69,7 @@ services:
 
   # Order Service for Testing
   order-service-test:
-    image: ecommerce/order-service:test
+    image: order-service
     container_name: order_service_test_container
     ports:
       - "8001:8000"
@@ -94,7 +94,7 @@ services:
 
   # Frontend for Testing
   frontend-test:
-    image: ecommerce/frontend:test
+    image: frontend
     container_name: frontend_test_container
     ports:
       - "3000:80"

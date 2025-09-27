@@ -121,7 +121,7 @@ pipeline {
                     }
                     post {
                         always {
-                            publishTestResults testResultsPattern: '**/test-results-product.xml'
+                                junit '**/test-results-product.xml'
                             publishCoverage adapters: [
                                 coberturaAdapter('**/coverage.xml')
                             ], sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
@@ -143,7 +143,7 @@ pipeline {
                     }
                     post {
                         always {
-                            publishTestResults testResultsPattern: '**/test-results-order.xml'
+                                junit '**/test-results-order.xml'
                             publishCoverage adapters: [
                                 coberturaAdapter('**/coverage.xml')
                             ], sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
@@ -173,7 +173,7 @@ pipeline {
                     }
                     post {
                         always {
-                            publishTestResults testResultsPattern: '**/integration-test-results.xml'
+                                junit '**/integration-test-results.xml'
                             bat 'docker-compose -f docker-compose.test.yml down -v'
                         }
                     }
