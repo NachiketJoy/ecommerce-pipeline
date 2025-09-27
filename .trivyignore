@@ -1,0 +1,11 @@
+# Trivy Security Scanner Ignore File
+# This file contains vulnerabilities that are acceptable for this project
+
+# Example: Ignore specific CVE if it's a false positive or acceptable risk
+# CVE-2021-12345
+
+# Ignore vulnerabilities in test dependencies
+# CVE-2022-67890
+
+# Ignore vulnerabilities that don't affect production usage
+# CVE-2023-11111
