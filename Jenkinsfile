@@ -24,7 +24,7 @@ pipeline {
                     steps {
                         echo 'Building Product Service Docker image...'
                         script {
-                            sh 'docker build -t product-service ./backend/product_service'
+                            bat 'docker build -t product-service ./backend/product_service'
                         }
                     }
                 }
@@ -33,7 +33,7 @@ pipeline {
                     steps {
                         echo 'Building Order Service Docker image...'
                         script {
-                            sh 'docker build -t order-service ./backend/order_service'
+                            bat 'docker build -t order-service ./backend/order_service'
                         }
                     }
                 }
@@ -42,7 +42,7 @@ pipeline {
                     steps {
                         echo 'Building Frontend Docker image...'
                         script {
-                            sh 'docker build -t frontend ./frontend'
+                            bat 'docker build -t frontend ./frontend'
                         }
                     }
                 }
@@ -61,9 +61,9 @@ pipeline {
                     steps {
                         echo 'Running Product Service unit tests...'
                         script {
-                            sh '''
-                                cd backend/product_service
-                                docker run --rm -v "$(pwd):/app" -w /app product-service python -m pytest tests/test_main.py -v --junitxml=test-results-product.xml
+                            bat '''
+                                cd backend\\product_service
+                                docker run --rm -v "%cd%:/app" -w /app product-service python -m pytest tests/test_main.py -v --junitxml=test-results-product.xml
                             '''
                         }
                     }
@@ -78,9 +78,9 @@ pipeline {
                     steps {
                         echo 'Running Order Service unit tests...'
                         script {
-                            sh '''
-                                cd backend/order_service
-                                docker run --rm -v "$(pwd):/app" -w /app order-service python -m pytest tests/test_main.py -v --junitxml=test-results-order.xml
+                            bat '''
+                                cd backend\\order_service
+                                docker run --rm -v "%cd%:/app" -w /app order-service python -m pytest tests/test_main.py -v --junitxml=test-results-order.xml
                             '''
                         }
                     }
@@ -95,30 +95,28 @@ pipeline {
                     steps {
                         echo 'Running integration tests...'
                         script {
-                            sh '''
+                            bat '''
                                 # Start test environment
                                 docker-compose -f docker-compose.test.yml up -d
                                 
                                 # Wait for services to be ready
-                                sleep 30
+                                timeout /t 30 /nobreak >nul 2>&1
                                 
                                 # Run simple integration tests
-                                mkdir -p test-reports
+                                mkdir test-reports 2>nul
                                 
                                 # Test product service
-                                curl -f http://localhost:8000/health > /dev/null 2>&1 && echo "Product service is healthy" || echo "Product service is not responding"
+                                curl -f http://localhost:8000/health >nul 2>&1 && echo Product service is healthy || echo Product service is not responding
                                 
                                 # Test order service
-                                curl -f http://localhost:8001/health > /dev/null 2>&1 && echo "Order service is healthy" || echo "Order service is not responding"
+                                curl -f http://localhost:8001/health >nul 2>&1 && echo Order service is healthy || echo Order service is not responding
                                 
                                 # Create a simple test report
-                                cat > test-reports/integration-test-results.xml << EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="integration-tests" tests="2" failures="0" errors="0" skipped="0">
-    <testcase name="product-service-health" classname="integration"/>
-    <testcase name="order-service-health" classname="integration"/>
-</testsuite>
-EOF
+                                echo ^<?xml version="1.0" encoding="UTF-8"?^> > test-reports\\integration-test-results.xml
+                                echo ^<testsuite name="integration-tests" tests="2" failures="0" errors="0" skipped="0"^> >> test-reports\\integration-test-results.xml
+                                echo ^<testcase name="product-service-health" classname="integration"/^> >> test-reports\\integration-test-results.xml
+                                echo ^<testcase name="order-service-health" classname="integration"/^> >> test-reports\\integration-test-results.xml
+                                echo ^</testsuite^> >> test-reports\\integration-test-results.xml
                                 
                                 # Clean up
                                 docker-compose -f docker-compose.test.yml down
@@ -140,10 +138,9 @@ EOF
                     steps {
                         echo 'Running SonarQube analysis for Product Service...'
                         script {
-                            sh '''
-                                cd backend/product_service
-                                docker run --rm -v "$(pwd):/app" -w /app -e SONAR_TOKEN="${SONAR_TOKEN}" product-service \
-                                    python -m pytest --cov=app --cov-report=xml --cov-report=html
+                            bat '''
+                                cd backend\\product_service
+                                docker run --rm -v "%cd%:/app" -w /app -e SONAR_TOKEN=%SONAR_TOKEN% product-service python -m pytest --cov=app --cov-report=xml --cov-report=html
                             '''
                         }
                     }
@@ -153,10 +150,9 @@ EOF
                     steps {
                         echo 'Running SonarQube analysis for Order Service...'
                         script {
-                            sh '''
-                                cd backend/order_service
-                                docker run --rm -v "$(pwd):/app" -w /app -e SONAR_TOKEN="${SONAR_TOKEN}" order-service \
-                                    python -m pytest --cov=app --cov-report=xml --cov-report=html
+                            bat '''
+                                cd backend\\order_service
+                                docker run --rm -v "%cd%:/app" -w /app -e SONAR_TOKEN=%SONAR_TOKEN% order-service python -m pytest --cov=app --cov-report=xml --cov-report=html
                             '''
                         }
                     }
@@ -170,12 +166,12 @@ EOF
                     steps {
                         echo 'Running container security scans...'
                         script {
-                            sh '''
+                            bat '''
                                 # Simple security check - just verify images exist
-                                docker images | grep product-service
-                                docker images | grep order-service
-                                docker images | grep frontend
-                                echo "All container images built successfully"
+                                docker images | findstr product-service
+                                docker images | findstr order-service
+                                docker images | findstr frontend
+                                echo All container images built successfully
                             '''
                         }
                     }
@@ -185,13 +181,13 @@ EOF
                     steps {
                         echo 'Running Python security scans...'
                         script {
-                            sh '''
+                            bat '''
                                 # Simple security check - verify no obvious security issues
-                                echo "Checking for hardcoded secrets..."
-                                grep -r "password" backend/ || echo "No password found"
-                                grep -r "secret" backend/ || echo "No secret found"
-                                grep -r "key" backend/ || echo "No key found"
-                                echo "Python security scan completed"
+                                echo Checking for hardcoded secrets...
+                                findstr /s /i "password" backend\\*.* || echo No password found
+                                findstr /s /i "secret" backend\\*.* || echo No secret found
+                                findstr /s /i "key" backend\\*.* || echo No key found
+                                echo Python security scan completed
                             '''
                         }
                     }
@@ -203,19 +199,19 @@ EOF
             steps {
                 echo 'Deploying to test environment...'
                 script {
-                    sh '''
+                    bat '''
                         # Deploy to test environment
                         docker-compose -f docker-compose.test.yml up -d
                         
                         # Wait for services to be ready
-                        sleep 30
+                        timeout /t 30 /nobreak >nul 2>&1
                         
                         # Verify deployment
-                        curl -f http://localhost:8000/health || exit 1
-                        curl -f http://localhost:8001/health || exit 1
-                        curl -f http://localhost:3000 || exit 1
+                        curl -f http://localhost:8000/health || exit /b 1
+                        curl -f http://localhost:8001/health || exit /b 1
+                        curl -f http://localhost:3000 || exit /b 1
                         
-                        echo "Test deployment successful!"
+                        echo Test deployment successful!
                     '''
                 }
             }
@@ -236,22 +232,22 @@ EOF
             steps {
                 echo 'Releasing to production...'
                 script {
-                    sh '''
+                    bat '''
                         # Tag the release
-                        git tag -a "v${BUILD_NUMBER}" -m "Release version ${BUILD_NUMBER}"
+                        git tag -a "v%BUILD_NUMBER%" -m "Release version %BUILD_NUMBER%"
                         
                         # Deploy to production
                         docker-compose up -d
                         
                         # Wait for services to be ready
-                        sleep 30
+                        timeout /t 30 /nobreak >nul 2>&1
                         
                         # Verify production deployment
-                        curl -f http://localhost:8000/health || exit 1
-                        curl -f http://localhost:8001/health || exit 1
-                        curl -f http://localhost:3000 || exit 1
+                        curl -f http://localhost:8000/health || exit /b 1
+                        curl -f http://localhost:8001/health || exit /b 1
+                        curl -f http://localhost:3000 || exit /b 1
                         
-                        echo "Production release successful!"
+                        echo Production release successful!
                     '''
                 }
             }
@@ -269,16 +265,16 @@ EOF
             steps {
                 echo 'Setting up monitoring and alerting...'
                 script {
-                    sh '''
+                    bat '''
                         # Simple monitoring setup
-                        echo "Setting up basic monitoring..."
+                        echo Setting up basic monitoring...
                         
                         # Check service health
-                        curl -f http://localhost:8000/health > /dev/null 2>&1 && echo "Product service: OK" || echo "Product service: FAIL"
-                        curl -f http://localhost:8001/health > /dev/null 2>&1 && echo "Order service: OK" || echo "Order service: FAIL"
-                        curl -f http://localhost:3000 > /dev/null 2>&1 && echo "Frontend: OK" || echo "Frontend: FAIL"
+                        curl -f http://localhost:8000/health >nul 2>&1 && echo Product service: OK || echo Product service: FAIL
+                        curl -f http://localhost:8001/health >nul 2>&1 && echo Order service: OK || echo Order service: FAIL
+                        curl -f http://localhost:3000 >nul 2>&1 && echo Frontend: OK || echo Frontend: FAIL
                         
-                        echo "Monitoring setup completed"
+                        echo Monitoring setup completed
                     '''
                 }
             }
