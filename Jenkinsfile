@@ -187,7 +187,10 @@ EOF
                         script {
                             sh '''
                                 # Simple security check - verify no obvious security issues
-                                find backend -name "*.py" -exec grep -l "password\|secret\|key" {} \; || echo "No hardcoded secrets found"
+                                echo "Checking for hardcoded secrets..."
+                                grep -r "password" backend/ || echo "No password found"
+                                grep -r "secret" backend/ || echo "No secret found"
+                                grep -r "key" backend/ || echo "No key found"
                                 echo "Python security scan completed"
                             '''
                         }
