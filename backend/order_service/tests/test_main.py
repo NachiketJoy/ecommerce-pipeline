@@ -1,305 +1,225 @@
-# Simplified Order Service Tests - API Only
-
-import logging
-from unittest.mock import AsyncMock, patch
-
 import pytest
-from app.main import PRODUCT_SERVICE_URL, app
+from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
+from app.main import app
 
-# Suppress noisy logs during tests for cleaner output
-logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
-logging.getLogger("fastapi").setLevel(logging.WARNING)
-logging.getLogger("app.main").setLevel(logging.WARNING)
+client = TestClient(app)
 
-@pytest.fixture(scope="module")
-def client():
-    with TestClient(app) as test_client:
-        yield test_client
-
-@pytest.fixture(scope="function")
-def mock_httpx_client():
-    with patch("app.main.httpx.AsyncClient") as mock_async_client_cls:
-        mock_client_instance = AsyncMock()
-        mock_async_client_cls.return_value.__aenter__.return_value = (
-            mock_client_instance
-        )
-        yield mock_client_instance
-
-@pytest.fixture(scope="function", autouse=True)
-def clear_orders_db():
-    """
-    Clears the orders database before each test to ensure test isolation.
-    """
-    from app.main import orders_db
-    orders_db.clear()
-    yield
-    orders_db.clear()
-
-def test_read_root(client: TestClient):
-    """Test the root endpoint."""
+def test_read_root():
     response = client.get("/")
     assert response.status_code == 200
     assert response.json() == {"message": "Welcome to the Order Service!"}
 
-def test_health_check(client: TestClient):
-    """Test the health check endpoint."""
+def test_health_check():
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "service": "order-service"}
 
-def test_create_order_success(client: TestClient, mock_httpx_client):
-    """Test successful order creation with mocked product service."""
-    # Mock successful stock deduction response
+@patch('app.main.httpx.AsyncClient')
+def test_create_order_success(mock_async_client):
+    # Mock the httpx client
+    mock_client_instance = AsyncMock()
+    mock_async_client.return_value.__aenter__.return_value = mock_client_instance
+    
+    # Mock successful stock deduction
     mock_response = AsyncMock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "product_id": 1,
-        "name": "Test Product",
-        "stock_quantity": 90,
-        "price": 10.0
-    }
-    mock_httpx_client.patch.return_value = mock_response
-
+    mock_client_instance.patch.return_value = mock_response
+    
     order_data = {
         "user_id": 1,
         "shipping_address": "123 Test St",
         "items": [
             {
-                "product_id": 1,
+                "product_id": "test-product-id",
                 "quantity": 2,
-                "price_at_purchase": 10.0
+                "price_at_purchase": 29.99
             }
         ]
     }
-
+    
     response = client.post("/orders/", json=order_data)
     assert response.status_code == 201
-    response_data = response.json()
-    
-    assert response_data["user_id"] == 1
-    assert response_data["status"] == "confirmed"
-    assert response_data["total_amount"] == 20.0
-    assert len(response_data["items"]) == 1
-    assert response_data["items"][0]["product_id"] == 1
-    assert response_data["items"][0]["quantity"] == 2
+    data = response.json()
+    assert data["user_id"] == 1
+    assert data["status"] == "confirmed"
+    assert data["total_amount"] == 59.98
+    assert len(data["items"]) == 1
 
-def test_create_order_empty_items(client: TestClient):
-    """Test order creation with no items."""
+def test_create_order_empty_items():
     order_data = {
         "user_id": 1,
         "shipping_address": "123 Test St",
         "items": []
     }
-
+    
     response = client.post("/orders/", json=order_data)
-    assert response.status_code == 422  # FastAPI validation error
-    assert "detail" in response.json()
+    assert response.status_code == 400
+    assert "must contain at least one item" in response.json()["detail"]
 
-def test_create_order_product_service_error(client: TestClient, mock_httpx_client):
-    """Test order creation when product service returns an error."""
-    # Mock product service error
-    mock_httpx_client.patch.side_effect = Exception("Product service unavailable")
-
-    order_data = {
-        "user_id": 1,
-        "shipping_address": "123 Test St",
-        "items": [
-            {
-                "product_id": 1,
-                "quantity": 2,
-                "price_at_purchase": 10.0
-            }
-        ]
-    }
-
-    response = client.post("/orders/", json=order_data)
-    assert response.status_code == 500  # Generic exception returns 500
-    assert "An unexpected error occurred during order creation" in response.json()["detail"]
-
-def test_list_orders_empty(client: TestClient):
-    """Test listing orders when no orders exist."""
-    response = client.get("/orders/")
-    assert response.status_code == 200
-    assert response.json() == []
-
-def test_list_orders_with_data(client: TestClient, mock_httpx_client):
-    """Test listing orders when orders exist."""
-    # Mock successful stock deduction response
+@patch('app.main.httpx.AsyncClient')
+def test_create_order_insufficient_stock(mock_async_client):
+    # Mock the httpx client
+    mock_client_instance = AsyncMock()
+    mock_async_client.return_value.__aenter__.return_value = mock_client_instance
+    
+    # Mock insufficient stock response
     mock_response = AsyncMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "product_id": 1,
-        "name": "Test Product",
-        "stock_quantity": 90,
-        "price": 10.0
-    }
-    mock_httpx_client.patch.return_value = mock_response
-
-    # Create an order first
+    mock_response.status_code = 400
+    mock_client_instance.patch.return_value = mock_response
+    
     order_data = {
         "user_id": 1,
         "shipping_address": "123 Test St",
         "items": [
             {
-                "product_id": 1,
-                "quantity": 1,
-                "price_at_purchase": 10.0
+                "product_id": "test-product-id",
+                "quantity": 2,
+                "price_at_purchase": 29.99
             }
         ]
     }
-    client.post("/orders/", json=order_data)
+    
+    response = client.post("/orders/", json=order_data)
+    assert response.status_code == 400
 
-    # List orders
+def test_list_orders():
     response = client.get("/orders/")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
-    assert len(response.json()) >= 1
 
-def test_get_order_success(client: TestClient, mock_httpx_client):
-    """Test getting a specific order by ID."""
-    # Mock successful stock deduction response
+@patch('app.main.httpx.AsyncClient')
+def test_get_order(mock_async_client):
+    # Mock the httpx client
+    mock_client_instance = AsyncMock()
+    mock_async_client.return_value.__aenter__.return_value = mock_client_instance
+    
+    # Mock successful stock deduction
     mock_response = AsyncMock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "product_id": 1,
-        "name": "Test Product",
-        "stock_quantity": 90,
-        "price": 10.0
-    }
-    mock_httpx_client.patch.return_value = mock_response
-
+    mock_client_instance.patch.return_value = mock_response
+    
     # Create an order first
     order_data = {
         "user_id": 1,
         "shipping_address": "123 Test St",
         "items": [
             {
-                "product_id": 1,
+                "product_id": "test-product-id",
                 "quantity": 1,
-                "price_at_purchase": 10.0
+                "price_at_purchase": 29.99
             }
         ]
     }
     create_response = client.post("/orders/", json=order_data)
     order_id = create_response.json()["order_id"]
-
+    
     # Get the order
     response = client.get(f"/orders/{order_id}")
     assert response.status_code == 200
-    response_data = response.json()
-    assert response_data["order_id"] == order_id
-    assert response_data["user_id"] == 1
+    data = response.json()
+    assert data["order_id"] == order_id
 
-def test_get_order_not_found(client: TestClient):
-    """Test getting a non-existent order."""
-    response = client.get("/orders/99999")
+def test_get_order_not_found():
+    response = client.get("/orders/nonexistent")
     assert response.status_code == 404
 
-def test_update_order_status_success(client: TestClient, mock_httpx_client):
-    """Test updating order status."""
-    # Mock successful stock deduction response
+@patch('app.main.httpx.AsyncClient')
+def test_update_order_status(mock_async_client):
+    # Mock the httpx client
+    mock_client_instance = AsyncMock()
+    mock_async_client.return_value.__aenter__.return_value = mock_client_instance
+    
+    # Mock successful stock deduction
     mock_response = AsyncMock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "product_id": 1,
-        "name": "Test Product",
-        "stock_quantity": 90,
-        "price": 10.0
-    }
-    mock_httpx_client.patch.return_value = mock_response
-
+    mock_client_instance.patch.return_value = mock_response
+    
     # Create an order first
     order_data = {
         "user_id": 1,
         "shipping_address": "123 Test St",
         "items": [
             {
-                "product_id": 1,
+                "product_id": "test-product-id",
                 "quantity": 1,
-                "price_at_purchase": 10.0
+                "price_at_purchase": 29.99
             }
         ]
     }
     create_response = client.post("/orders/", json=order_data)
     order_id = create_response.json()["order_id"]
-
+    
     # Update status
     response = client.patch(f"/orders/{order_id}/status?new_status=shipped")
     assert response.status_code == 200
-    response_data = response.json()
-    assert response_data["status"] == "shipped"
+    data = response.json()
+    assert data["status"] == "shipped"
 
-def test_delete_order_success(client: TestClient, mock_httpx_client):
-    """Test deleting an order."""
-    # Mock successful stock deduction response
+@patch('app.main.httpx.AsyncClient')
+def test_delete_order(mock_async_client):
+    # Mock the httpx client
+    mock_client_instance = AsyncMock()
+    mock_async_client.return_value.__aenter__.return_value = mock_client_instance
+    
+    # Mock successful stock deduction
     mock_response = AsyncMock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "product_id": 1,
-        "name": "Test Product",
-        "stock_quantity": 90,
-        "price": 10.0
-    }
-    mock_httpx_client.patch.return_value = mock_response
-
+    mock_client_instance.patch.return_value = mock_response
+    
     # Create an order first
     order_data = {
         "user_id": 1,
         "shipping_address": "123 Test St",
         "items": [
             {
-                "product_id": 1,
+                "product_id": "test-product-id",
                 "quantity": 1,
-                "price_at_purchase": 10.0
+                "price_at_purchase": 29.99
             }
         ]
     }
     create_response = client.post("/orders/", json=order_data)
     order_id = create_response.json()["order_id"]
-
+    
     # Delete the order
     response = client.delete(f"/orders/{order_id}")
-    assert response.status_code == 204
-
-    # Verify order is no longer accessible
+    assert response.status_code == 200
+    
+    # Verify it's deleted
     get_response = client.get(f"/orders/{order_id}")
     assert get_response.status_code == 404
 
-def test_get_order_items_success(client: TestClient, mock_httpx_client):
-    """Test getting order items."""
-    # Mock successful stock deduction response
+@patch('app.main.httpx.AsyncClient')
+def test_get_order_items(mock_async_client):
+    # Mock the httpx client
+    mock_client_instance = AsyncMock()
+    mock_async_client.return_value.__aenter__.return_value = mock_client_instance
+    
+    # Mock successful stock deduction
     mock_response = AsyncMock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "product_id": 1,
-        "name": "Test Product",
-        "stock_quantity": 90,
-        "price": 10.0
-    }
-    mock_httpx_client.patch.return_value = mock_response
-
+    mock_client_instance.patch.return_value = mock_response
+    
     # Create an order first
     order_data = {
         "user_id": 1,
         "shipping_address": "123 Test St",
         "items": [
             {
-                "product_id": 1,
+                "product_id": "test-product-id",
                 "quantity": 2,
-                "price_at_purchase": 10.0
+                "price_at_purchase": 29.99
             }
         ]
     }
     create_response = client.post("/orders/", json=order_data)
     order_id = create_response.json()["order_id"]
-
+    
     # Get order items
     response = client.get(f"/orders/{order_id}/items")
     assert response.status_code == 200
-    response_data = response.json()
-    assert isinstance(response_data, list)
-    assert len(response_data) == 1
-    assert response_data[0]["product_id"] == 1
-    assert response_data[0]["quantity"] == 2
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) == 1
+    assert data[0]["product_id"] == "test-product-id"

@@ -1,68 +1,42 @@
-
-# Simplified Test Environment - API Only
+version: '3.8'
 
 services:
-  # Product Service for Testing
   product-service-test:
-    image: product-service:latest
-    container_name: product_service_test_container
+    build: ./backend/product_service
     ports:
       - "8000:8000"
     environment:
-      AZURE_STORAGE_ACCOUNT_NAME: testaccount
-      AZURE_STORAGE_ACCOUNT_KEY: testkey
-      AZURE_STORAGE_CONTAINER_NAME: test-images
-      AZURE_SAS_TOKEN_EXPIRY_HOURS: 1
-    volumes:
-      - ./test-reports:/app/test-reports
-    networks:
-      - ecommerce_test_network
+      - PYTHONPATH=/app
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
       timeout: 5s
       retries: 3
 
-  # Order Service for Testing
   order-service-test:
-    image: order-service:latest
-    container_name: order_service_test_container
+    build: ./backend/order_service
     ports:
       - "8001:8000"
     environment:
-      PRODUCT_SERVICE_URL: http://product-service-test:8000
-    volumes:
-      - ./test-reports:/app/test-reports
+      - PYTHONPATH=/app
+      - PRODUCT_SERVICE_URL=http://product-service-test:8000
     depends_on:
       product-service-test:
         condition: service_healthy
-    networks:
-      - ecommerce_test_network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
       timeout: 5s
       retries: 3
 
-  # Frontend for Testing
   frontend-test:
-    image: frontend:latest
-    container_name: frontend_test_container
+    build: ./frontend
     ports:
       - "3000:80"
     depends_on:
-      product-service-test:
-        condition: service_healthy
-      order-service-test:
-        condition: service_healthy
-    networks:
-      - ecommerce_test_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      - product-service-test
+      - order-service-test
 
 networks:
-  ecommerce_test_network:
+  default:
     driver: bridge

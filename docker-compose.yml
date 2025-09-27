@@ -1,61 +1,42 @@
-# Simplified E-commerce Microservices - API Only
-
-version: "3.8"
+version: '3.8'
 
 services:
-  # Product Microservice (FastAPI)
-  product_service:
-    build:
-      context: ./backend/product_service
-      dockerfile: Dockerfile
-    container_name: product_api_container
-    image: simplified_product_service:latest
-    restart: always
+  product-service:
+    build: ./backend/product_service
     ports:
       - "8000:8000"
     environment:
-      AZURE_STORAGE_ACCOUNT_NAME: <your_storage_account_name> # Replace with your Azure Storage account name
-      AZURE_STORAGE_ACCOUNT_KEY: <your_storage_account_key> # Replace with your Azure Storage account key
-      AZURE_STORAGE_CONTAINER_NAME: <your_container_name> # Replace with your Azure Storage container name
-      AZURE_SAS_TOKEN_EXPIRY_HOURS: 24
-    volumes:
-      - ./backend/product_service/app:/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+      - PYTHONPATH=/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Order Microservice (FastAPI)
-  order_service:
-    build:
-      context: ./backend/order_service
-      dockerfile: Dockerfile
-    image: simplified_order_service:latest
-    container_name: order_api_container
-    restart: always
+  order-service:
+    build: ./backend/order_service
     ports:
       - "8001:8000"
     environment:
-      PRODUCT_SERVICE_URL: http://product_service:8000
+      - PYTHONPATH=/app
+      - PRODUCT_SERVICE_URL=http://product-service:8000
     depends_on:
-      product_service:
-        condition: service_started
-    volumes:
-      - ./backend/order_service/app:/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+      product-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Frontend Service (Simple HTML/JS served by Nginx)
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    image: simplified_frontend:latest
-    container_name: product_order_frontend
-    restart: always
-    # Frontend connects to host ports, which are mapped to container ports
+    build: ./frontend
     ports:
-      - "3000:80" # Map container port 80 (Nginx default) to host port 3000
+      - "3000:80"
     depends_on:
-      product_service:
-        condition: service_started
-      order_service:
-        condition: service_started
-    volumes:
-      - ./frontend:/usr/share/nginx/html # Mount frontend files directly
+      - product-service
+      - order-service
+
+networks:
+  default:
+    driver: bridge
