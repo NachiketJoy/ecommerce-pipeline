@@ -3,8 +3,8 @@ pipeline {
     
     environment {
         // Docker and Registry Configuration
-        DOCKER_REGISTRY = 'your-registry.com'
-        DOCKER_NAMESPACE = 'ecommerce'
+        DOCKER_REGISTRY = 'docker.io'
+        DOCKER_NAMESPACE = 'njoy10'
         
         // Application Configuration
         PRODUCT_SERVICE_IMAGE = "${DOCKER_NAMESPACE}/product-service"
